@@ -1,0 +1,3201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5, user-scalable=yes">
+    <title>REGISTRO DE TURNO · EDITORIAL BINOMIO</title>
+    <meta name="description" content="Sistema multi‑usuario para registro de turnos mañana/tarde – almacenamiento en la nube y control total">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Firebase SDK modular -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, serverTimestamp, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js";
+        
+        // Configuración Firebase (activa - reemplazar con credenciales propias en producción)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDREED85Ig_NLyLEMzLtjRLwrYPZn1Em0g",
+            authDomain: "registro-binomio.firebaseapp.com",
+            projectId: "registro-binomio",
+            storageBucket: "registro-binomio.firebasestorage.app",
+            messagingSenderId: "1005145229027",
+            appId: "1:1005145229027:web:e8f6a5c7027d33ed7727d6",
+            measurementId: "G-TRYZPKQG0J"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const messaging = getMessaging(app);
+        
+        // VAPID Key proporcionada
+        const VAPID_KEY = "BKj9M74NZ379aAl82qmOJrcOEQCh932pOyYaLzwDyf_VgXSWCr5DoNZbahYJqJQf1ypUc5sZhu3aoUQgNbh1hEs";
+        
+        // Exponer globalmente para uso en script no-module
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.firebaseMessaging = messaging;
+        window.firebaseVapidKey = VAPID_KEY;
+        window.GoogleAuthProvider = GoogleAuthProvider;
+        window.signInWithPopup = signInWithPopup;
+        window.signOut = signOut;
+        window.onAuthStateChanged = onAuthStateChanged;
+        window.firebaseDoc = doc;
+        window.firebaseSetDoc = setDoc;
+        window.firebaseGetDoc = getDoc;
+        window.firebaseAddDoc = addDoc;
+        window.firebaseCollection = collection;
+        window.serverTimestamp = serverTimestamp;
+        window.getToken = getToken;
+        window.onMessage = onMessage;
+    </script>
+    <style>
+        :root {
+            --color-primary: #121212;
+            --color-secondary: #1e1e1e;
+            --color-tertiary: #2d2d2d;
+            --color-accent: #4CAF50;
+            --color-accent-dark: #388E3C;
+            --color-text: #e0e0e0;
+            --color-text-light: #ffffff;
+            --color-text-muted: #888888;
+            --color-danger: #f44336;
+            --color-warning: #FF9800;
+            --color-info: #2196F3;
+            --color-border: #333333;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --radius: 12px;
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        body {
+            background: var(--color-primary);
+            color: var(--color-text);
+            min-height: 100vh;
+            padding: 0;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 16px;
+        }
+        
+        /* Header */
+        header {
+            background: var(--color-secondary);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--color-border);
+        }
+        
+        h1 {
+            font-size: clamp(1.5rem, 4vw, 2.2rem);
+            margin-bottom: 8px;
+            color: var(--color-text-light);
+            font-weight: 700;
+            text-align: center;
+        }
+        
+        .subtitle {
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+            color: var(--color-text-muted);
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        /* User Info */
+        .user-info {
+            background: var(--color-tertiary);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid var(--color-border);
+            margin-top: 20px;
+        }
+        
+        .user-display {
+            font-size: clamp(1rem, 3vw, 1.3rem);
+            color: var(--color-accent);
+            font-weight: bold;
+            padding: 12px 20px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 8px;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+        
+        /* Current Time */
+        .current-time {
+            text-align: center;
+            margin: 24px 0;
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+            color: var(--color-warning);
+            font-weight: 700;
+            background: var(--color-tertiary);
+            padding: 16px;
+            border-radius: var(--radius);
+            border: 1px solid rgba(255, 152, 0, 0.3);
+        }
+        
+        /* Cards */
+        .card {
+            background: var(--color-secondary);
+            border-radius: var(--radius);
+            padding: clamp(16px, 3vw, 24px);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--color-border);
+            margin-bottom: 24px;
+            width: 100%;
+        }
+        
+        .card h2 {
+            color: var(--color-text-light);
+            margin-bottom: 24px;
+            font-size: clamp(1.2rem, 3vw, 1.6rem);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        
+        /* Turn Buttons */
+        .turn-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        @media (max-width: 480px) {
+            .turn-buttons {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .btn {
+            padding: clamp(16px, 3vw, 20px) clamp(12px, 2vw, 16px);
+            border: none;
+            border-radius: var(--radius);
+            font-size: clamp(0.9rem, 2vw, 1.1rem);
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            text-align: center;
+            min-height: 70px;
+            box-shadow: var(--shadow);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-turno-manana {
+            background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);
+            color: white;
+            border: 2px solid rgba(255, 152, 0, 0.5);
+        }
+        
+        .btn-turno-tarde {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            border: 2px solid rgba(33, 150, 243, 0.5);
+        }
+        
+        .btn-exportar {
+            background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+            color: white;
+        }
+        
+        .btn-importar {
+            background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
+            color: white;
+        }
+        
+        .btn-login {
+            background: linear-gradient(135deg, #4285F4 0%, #3367D6 100%);
+            color: white;
+        }
+        
+        .btn-logout {
+            background: linear-gradient(135deg, #EA4335 0%, #D23A2E 100%);
+            color: white;
+        }
+        
+        .btn-cambiar-usuario {
+            background: linear-gradient(135deg, #607D8B 0%, #455A64 100%);
+            color: white;
+        }
+        
+        .btn-gestion-usuarios {
+            background: linear-gradient(135deg, #009688 0%, #00796B 100%);
+            color: white;
+        }
+        
+        .btn-notificaciones {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF4757 100%);
+            color: white;
+        }
+        
+        /* NUEVO BOTÓN: LIMPIAR REGISTROS DEL MES */
+        .btn-limpiar-mes {
+            background: linear-gradient(135deg, #8B0000 0%, #B22222 100%);
+            color: white;
+            border: 2px solid rgba(255, 69, 0, 0.5);
+        }
+        
+        /* Actions Grid */
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
+        @media (max-width: 480px) {
+            .actions {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--color-text);
+            font-size: clamp(0.9rem, 2vw, 1rem);
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 14px;
+            border-radius: var(--radius);
+            border: 2px solid var(--color-border);
+            background: var(--color-tertiary);
+            color: var(--color-text);
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            transition: var(--transition);
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            background: var(--color-secondary);
+        }
+        
+        /* Status Messages */
+        .status {
+            text-align: center;
+            padding: 16px;
+            margin-top: 20px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            display: none;
+            font-size: clamp(0.9rem, 2vw, 1rem);
+        }
+        
+        .status-success {
+            background: rgba(76, 175, 80, 0.15);
+            border: 2px solid var(--color-accent);
+            color: #C8E6C9;
+        }
+        
+        .status-error {
+            background: rgba(244, 67, 54, 0.15);
+            border: 2px solid var(--color-danger);
+            color: #FFCDD2;
+        }
+        
+        /* Table */
+        .registros {
+            margin-top: 24px;
+            overflow-x: auto;
+            border-radius: var(--radius);
+            border: 1px solid var(--color-border);
+            background: var(--color-tertiary);
+            padding: 12px;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+            background: var(--color-secondary);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        
+        th, td {
+            padding: 14px 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--color-border);
+            font-size: clamp(0.8rem, 1.5vw, 0.9rem);
+        }
+        
+        th {
+            background: linear-gradient(135deg, var(--color-tertiary) 0%, #2a2a2a 100%);
+            color: var(--color-text-light);
+            font-weight: 700;
+            position: sticky;
+            top: 0;
+        }
+        
+        .dia-semana {
+            font-weight: bold;
+            color: var(--color-warning);
+        }
+        
+        .domingo {
+            background: rgba(244, 67, 54, 0.08);
+        }
+        
+        .domingo td {
+            color: #FFCDD2;
+            font-style: italic;
+        }
+        
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--color-primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: var(--color-text);
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--color-border);
+            border-top-color: var(--color-accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Modals */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 9998;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            overflow-y: auto;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: var(--color-secondary);
+            padding: clamp(20px, 4vw, 30px);
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--color-border);
+        }
+        
+        .modal h3 {
+            color: var(--color-warning);
+            margin-bottom: 20px;
+            font-size: clamp(1.2rem, 3vw, 1.5rem);
+            text-align: center;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+        
+        .modal-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            font-weight: 700;
+            transition: var(--transition);
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .modal-btn.confirm {
+            background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
+            color: white;
+        }
+        
+        .modal-btn.cancel {
+            background: linear-gradient(135deg, var(--color-danger) 0%, #D32F2F 100%);
+            color: white;
+        }
+        
+        .modal-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Developer Panel */
+        .dev-panel {
+            background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+            border-radius: var(--radius);
+            padding: clamp(16px, 3vw, 24px);
+            margin-top: 24px;
+            display: none;
+            border: 1px solid var(--color-border);
+            position: relative;
+        }
+        
+        .dev-panel h3 {
+            color: var(--color-warning);
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: clamp(1.2rem, 3vw, 1.5rem);
+        }
+        
+        .code-editor {
+            background: #0d0d0d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid var(--color-border);
+        }
+        
+        .code-editor textarea {
+            width: 100%;
+            height: 200px;
+            background: #0d0d0d;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border: none;
+            border-radius: 4px;
+            padding: 12px;
+            resize: vertical;
+        }
+        
+        .dev-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .dev-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            flex: 1;
+            min-width: 140px;
+        }
+        
+        .dev-btn.save {
+            background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+            color: white;
+        }
+        
+        .dev-btn.reset {
+            background: linear-gradient(135deg, #f44336 0%, #D32F2F 100%);
+            color: white;
+        }
+        
+        .dev-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Password Modal */
+        .password-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        
+        .password-modal.active {
+            display: flex;
+        }
+        
+        .password-content {
+            background: var(--color-secondary);
+            padding: clamp(20px, 4vw, 30px);
+            border-radius: var(--radius);
+            width: 100%;
+            max-width: 400px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--color-border);
+        }
+        
+        .password-content h3 {
+            color: var(--color-warning);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .password-input {
+            width: 100%;
+            padding: 14px;
+            margin: 16px 0;
+            border-radius: var(--radius);
+            border: 2px solid var(--color-border);
+            background: var(--color-tertiary);
+            color: var(--color-text);
+            font-size: 1rem;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .password-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        
+        .password-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .password-btn.confirm {
+            background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%);
+            color: white;
+        }
+        
+        .password-btn.cancel {
+            background: linear-gradient(135deg, var(--color-danger) 0%, #D32F2F 100%);
+            color: white;
+        }
+        
+        /* Cloud Status */
+        .cloud-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 16px;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: clamp(0.9rem, 2vw, 1rem);
+            font-weight: 700;
+        }
+        
+        .cloud-connected {
+            background: rgba(76, 175, 80, 0.15);
+            border: 2px solid var(--color-accent);
+            color: #C8E6C9;
+        }
+        
+        .cloud-disconnected {
+            background: rgba(244, 67, 54, 0.15);
+            border: 2px solid var(--color-danger);
+            color: #FFCDD2;
+        }
+        
+        /* Notifications Panel */
+        .notifications-panel {
+            background: var(--color-tertiary);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-top: 24px;
+            border: 1px solid var(--color-border);
+        }
+        
+        .notifications-panel h3 {
+            color: var(--color-warning);
+            margin-bottom: 16px;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .token-display {
+            background: #0d0d0d;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            word-break: break-all;
+            margin: 15px 0;
+            border: 1px solid var(--color-border);
+            color: #00ff00;
+        }
+        
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .schedule-item {
+            background: var(--color-secondary);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+        }
+        
+        .schedule-time {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--color-warning);
+            margin-bottom: 5px;
+        }
+        
+        .schedule-desc {
+            font-size: 0.9rem;
+            color: var(--color-text-muted);
+        }
+        
+        .schedule-status {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+        }
+        
+        .status-inactive {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+        
+        .notification-test {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        /* Footer */
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: var(--color-text-muted);
+            font-size: clamp(0.8rem, 2vw, 0.9rem);
+            background: var(--color-secondary);
+            border-radius: var(--radius);
+            border: 1px solid var(--color-border);
+        }
+        
+        /* Responsive Improvements */
+        @media (max-width: 768px) {
+            .container {
+                padding: 12px;
+            }
+            
+            header, .card {
+                padding: 16px;
+            }
+            
+            .btn {
+                min-height: 60px;
+            }
+            
+            table {
+                min-width: 100%;
+            }
+            
+            th, td {
+                padding: 10px 8px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .turn-buttons {
+                gap: 12px;
+            }
+            
+            .actions {
+                gap: 10px;
+            }
+            
+            .modal-btn {
+                min-width: 100px;
+                padding: 10px 16px;
+            }
+            
+            .dev-btn {
+                min-width: 120px;
+            }
+        }
+        
+        /* Touch optimizations */
+        @media (hover: none) {
+            .btn:hover, .modal-btn:hover, .dev-btn:hover {
+                transform: none;
+            }
+        }
+    </style>
+    
+    <!-- ESTILOS DEL DOODLE FESTIVIDADES BOLIVIA (AUTOMÁTICO) -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Source+Sans+Pro:wght@400;600&display=swap');
+        
+        /* ============================================
+           ESTILOS DEL DOODLE OVERLAY
+           ============================================ */
+        .doodle-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 99999;
+            overflow: hidden;
+            animation: doodleEnter 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .doodle-background {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, #0f3460 0%, #16213e 50%, #1a1a2e 100%);
+            overflow: hidden;
+        }
+
+        .gradient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(100px);
+            opacity: 0.4;
+            animation: orbFloat 25s infinite ease-in-out;
+        }
+
+        .orb-1 {
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(233, 69, 96, 0.3) 0%, transparent 70%);
+            top: -300px;
+            right: -200px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(15, 52, 96, 0.5) 0%, transparent 70%);
+            bottom: -200px;
+            left: -200px;
+            animation-delay: -8s;
+        }
+
+        .orb-3 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(255, 215, 0, 0.2) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: -15s;
+        }
+
+        .doodle-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: all;
+            cursor: crosshair;
+        }
+
+        .doodle-ui {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+            pointer-events: none;
+            width: 90%;
+            max-width: 900px;
+        }
+
+        .editorial-container {
+            display: flex;
+            align-items: baseline;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            margin-bottom: 1rem;
+        }
+
+        .doodle-letter {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            font-weight: 700;
+            color: #ffffff;
+            text-shadow: 0 4px 30px rgba(0,0,0,0.3);
+            opacity: 0;
+            transform: translateY(80px) rotateX(-90deg);
+            animation: letterDrop 1s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            animation-delay: var(--delay);
+            display: inline-block;
+        }
+
+        .doodle-letter:nth-child(1) { color: #e94560; animation-delay: 0s; }
+        .doodle-letter:nth-child(2) { color: #ffffff; animation-delay: 0.08s; }
+        .doodle-letter:nth-child(3) { color: #e94560; animation-delay: 0.16s; }
+        .doodle-letter:nth-child(4) { color: #ffffff; animation-delay: 0.24s; }
+        .doodle-letter:nth-child(5) { color: #e94560; animation-delay: 0.32s; }
+        .doodle-letter:nth-child(6) { color: #ffffff; animation-delay: 0.40s; }
+        .doodle-letter:nth-child(7) { color: #e94560; animation-delay: 0.48s; }
+        .doodle-letter:nth-child(8) { color: #ffffff; animation-delay: 0.56s; }
+        .doodle-letter:nth-child(9) { color: #e94560; animation-delay: 0.64s; }
+
+        .doodle-space {
+            width: 1.5rem;
+        }
+
+        .binomio-container {
+            display: flex;
+            align-items: baseline;
+            gap: 0.2rem;
+            margin-top: -0.5rem;
+        }
+
+        .binomio-letter {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(3rem, 10vw, 6rem);
+            font-weight: 900;
+            opacity: 0;
+            transform: scale(0.5) rotateY(90deg);
+            animation: binomioEnter 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+            animation-delay: var(--delay);
+            display: inline-block;
+            letter-spacing: -2px;
+        }
+
+        .binomio-letter:nth-child(1) { color: #ffd700; text-shadow: 0 0 40px rgba(255, 215, 0, 0.5); animation-delay: 0.8s; }
+        .binomio-letter:nth-child(2) { color: #ffffff; animation-delay: 0.9s; }
+        .binomio-letter:nth-child(3) { color: #ffd700; text-shadow: 0 0 40px rgba(255, 215, 0, 0.5); animation-delay: 1.0s; }
+        .binomio-letter:nth-child(4) { color: #ffffff; animation-delay: 1.1s; }
+        .binomio-letter:nth-child(5) { color: #ffd700; text-shadow: 0 0 40px rgba(255, 215, 0, 0.5); animation-delay: 1.2s; }
+        .binomio-letter:nth-child(6) { color: #ffffff; animation-delay: 1.3s; }
+        .binomio-letter:nth-child(7) { color: #ffd700; text-shadow: 0 0 40px rgba(255, 215, 0, 0.5); animation-delay: 1.4s; }
+
+        .festividad-badge {
+            margin-top: 2rem;
+            padding: 1rem 2rem;
+            background: rgba(233, 69, 96, 0.2);
+            border: 2px solid rgba(233, 69, 96, 0.5);
+            border-radius: 50px;
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateY(30px);
+            animation: badgeEnter 0.8s ease 1.6s forwards;
+        }
+
+        .festividad-texto {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(1.2rem, 4vw, 2rem);
+            color: #ffd700;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .festividad-sub {
+            font-family: 'Source Sans Pro', sans-serif;
+            font-size: 0.9rem;
+            color: rgba(255,255,255,0.7);
+            margin-top: 0.3rem;
+            text-align: center;
+        }
+
+        .doodle-close {
+            position: absolute;
+            top: 2rem;
+            right: 2rem;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .doodle-close:hover {
+            background: rgba(233, 69, 96, 0.3);
+            border-color: rgba(233, 69, 96, 0.5);
+            transform: rotate(90deg) scale(1.1);
+        }
+
+        .doodle-share {
+            position: absolute;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 0.875rem 1.75rem;
+            border-radius: 30px;
+            border: 2px solid rgba(255,215,0,0.3);
+            background: rgba(255,215,0,0.1);
+            backdrop-filter: blur(10px);
+            color: #ffd700;
+            font-family: 'Source Sans Pro', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            letter-spacing: 1px;
+        }
+
+        .doodle-share:hover {
+            background: rgba(255,215,0,0.2);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(255,215,0,0.2);
+        }
+
+        @keyframes doodleEnter {
+            from { opacity: 0; transform: scale(1.1); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes letterDrop {
+            to { opacity: 1; transform: translateY(0) rotateX(0); }
+        }
+
+        @keyframes binomioEnter {
+            0% { opacity: 0; transform: scale(0.5) rotateY(90deg); }
+            50% { opacity: 0.8; transform: scale(1.1) rotateY(-10deg); }
+            100% { opacity: 1; transform: scale(1) rotateY(0); }
+        }
+
+        @keyframes badgeEnter {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes orbFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(40px, -40px) scale(1.1); }
+            66% { transform: translate(-30px, 30px) scale(0.9); }
+        }
+    </style>
+</head>
+<body>
+    <!-- Pantalla de carga -->
+    <div class="loading-screen" id="loading-screen">
+        <div class="loading-spinner"></div>
+        <div style="font-size: clamp(1.2rem, 3vw, 1.8rem); font-weight: 700; margin-bottom: 10px;">SISTEMA DE REGISTRO</div>
+        <div style="color: var(--color-text-muted); text-align: center;">Cargando...</div>
+    </div>
+
+    <!-- Modal para contraseña de desarrollador -->
+    <div class="password-modal" id="password-modal">
+        <div class="password-content">
+            <h3>🔐 ACCESO DESARROLLADOR</h3>
+            <p style="text-align: center; margin-bottom: 20px; color: var(--color-text-muted);">
+                Ingresa la contraseña para acceder a opciones de desarrollador
+            </p>
+            <input type="password" class="password-input" id="password-input" placeholder="Contraseña">
+            <div class="password-buttons">
+                <button class="password-btn confirm" id="password-confirm">CONFIRMAR</button>
+                <button class="password-btn cancel" id="password-cancel">CANCELAR</button>
+            </div>
+            <div id="password-error" style="color: var(--color-danger); text-align: center; margin-top: 15px; display: none;">
+                ❌ Contraseña incorrecta
+            </div>
+        </div>
+    </div>
+
+    <div class="container" id="main-system" style="display: none;">
+        <header>
+            <h1>📊 REGISTRO DE TURNO EDITORIAL BINOMIO</h1>
+            <p class="subtitle">Sistema multi-usuario para registro de turnos mañana y tarde</p>
+            
+            <div class="user-info">
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <div>
+                            <strong>👤 Usuario Actual:</strong> 
+                            <span id="nombre-display" class="user-display">Cargando...</span>
+                        </div>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto;">
+                            <button class="btn btn-cambiar-usuario" id="cambiar-usuario">
+                                <i class="fas fa-sync-alt"></i> Cambiar
+                            </button>
+                            <button class="btn btn-gestion-usuarios" id="gestion-usuarios">
+                                <i class="fas fa-users"></i> Usuarios
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="btn btn-login" id="login-google" style="display: none;">
+                            <i class="fab fa-google"></i> Iniciar Sesión
+                        </button>
+                        <button class="btn btn-logout" id="logout-google" style="display: none;">
+                            <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                        </button>
+                        <button class="btn btn-notificaciones" id="solicitar-permisos">
+                            <i class="fas fa-bell"></i> Activar Notificaciones
+                        </button>
+                        <button class="btn" id="toggle-dev" style="background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);">
+                            <i class="fas fa-code"></i> Desarrollador
+                        </button>
+                    </div>
+                    
+                    <div id="cloud-status" class="cloud-status cloud-disconnected">
+                        <i class="fas fa-cloud"></i> <span id="cloud-status-text">Desconectado</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+        
+        <div class="current-time" id="current-time"></div>
+        
+        <div class="main-content">
+            <!-- Panel de Desarrollador -->
+            <div class="dev-panel" id="dev-panel">
+                <h3><i class="fas fa-code"></i> PANEL DE DESARROLLADOR</h3>
+                <p style="text-align: center; margin-bottom: 20px; color: var(--color-text-muted);">
+                    Implementa mejoras en tiempo real para todos los usuarios
+                </p>
+                
+                <div class="code-editor">
+                    <h4 style="color: var(--color-warning); margin-bottom: 10px; font-size: 1.1rem;">
+                        <i class="fas fa-edit"></i> EDITOR DE MEJORAS
+                    </h4>
+                    <textarea id="dev-code" placeholder="// Escribe aquí las mejoras en JavaScript...
+// Ejemplo: function nuevaFuncion() { console.log('Mejora implementada'); }"></textarea>
+                </div>
+                
+                <div class="dev-actions">
+                    <button class="dev-btn save" id="dev-save">
+                        <i class="fas fa-rocket"></i> IMPLEMENTAR MEJORAS
+                    </button>
+                    <button class="dev-btn reset" id="dev-reset">
+                        <i class="fas fa-redo"></i> RESTAURAR SISTEMA
+                    </button>
+                </div>
+                
+                <div id="dev-status" style="margin-top: 20px; padding: 15px; border-radius: 8px; display: none; font-size: 0.9rem;"></div>
+            </div>
+
+            <!-- Panel de Notificaciones FCM -->
+            <div class="notifications-panel" id="notifications-panel">
+                <h3><i class="fas fa-bell"></i> NOTIFICACIONES PUSH</h3>
+                
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-notificaciones" id="test-notification" style="width: 100%;">
+                        <i class="fas fa-paper-plane"></i> ENVIAR NOTIFICACIÓN DE PRUEBA
+                    </button>
+                </div>
+                
+                <div id="token-display" class="token-display">
+                    Solicitando permiso para notificaciones...
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <h4 style="color: var(--color-warning); margin-bottom: 15px;">📅 RECORDATORIOS PROGRAMADOS (15 MIN ANTES)</h4>
+                    
+                    <div class="schedule-grid">
+                        <div class="schedule-item">
+                            <div class="schedule-time">🌅 08:45</div>
+                            <div class="schedule-desc">Entrada Mañana</div>
+                            <div class="schedule-status status-active">ACTIVO</div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="schedule-time">🏁 12:45</div>
+                            <div class="schedule-desc">Salida Mañana</div>
+                            <div class="schedule-status status-active">ACTIVO</div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="schedule-time">☀️ 14:15</div>
+                            <div class="schedule-desc">Entrada Tarde</div>
+                            <div class="schedule-status status-active">ACTIVO</div>
+                        </div>
+                        
+                        <div class="schedule-item">
+                            <div class="schedule-time">🌙 18:45</div>
+                            <div class="schedule-desc">Salida Tarde</div>
+                            <div class="schedule-status status-active">ACTIVO</div>
+                        </div>
+                    </div>
+                    
+                    <p style="color: var(--color-text-muted); font-size: 0.9rem; margin-top: 15px; text-align: center;">
+                        <i class="fas fa-info-circle"></i> Las notificaciones aparecerán en el banner del dispositivo
+                    </p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="fas fa-clock"></i> Control de Turnos</h2>
+                <div class="turn-buttons">
+                    <button class="btn btn-turno-manana" id="entrada-manana">
+                        <i class="fas fa-sun"></i> Entrada Mañana
+                    </button>
+                    <button class="btn btn-turno-manana" id="salida-manana">
+                        <i class="fas fa-sign-out-alt"></i> Salida Mañana
+                    </button>
+                    <button class="btn btn-turno-tarde" id="entrada-tarde">
+                        <i class="fas fa-moon"></i> Entrada Tarde
+                    </button>
+                    <button class="btn btn-turno-tarde" id="salida-tarde">
+                        <i class="fas fa-sign-out-alt"></i> Salida Tarde
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <label for="salario-hora"><i class="fas fa-money-bill-wave"></i> Salario por Hora ($)</label>
+                    <input type="number" id="salario-hora" placeholder="Ej: 8.50" step="0.01" min="0" value="8.50">
+                </div>
+                
+                <div class="actions">
+                    <button class="btn btn-exportar" id="exportar-sistema">
+                        <i class="fas fa-file-export"></i> Exportar JSON
+                    </button>
+                    <button class="btn btn-importar" id="importar-sistema">
+                        <i class="fas fa-file-import"></i> Importar JSON
+                    </button>
+                    <button class="btn btn-limpiar-mes" id="limpiar-mes-actual">
+                        <i class="fas fa-trash-alt"></i> Limpiar mes actual
+                    </button>
+                </div>
+                
+                <div id="status-message" class="status"></div>
+            </div>
+            
+            <div class="card">
+                <h2><i class="fas fa-chart-line"></i> Registros Diarios</h2>
+                
+                <div class="form-group">
+                    <label for="filtro-mes"><i class="fas fa-calendar"></i> Filtrar por Mes:</label>
+                    <select id="filtro-mes">
+                        <option value="todos">Todos los meses</option>
+                    </select>
+                </div>
+                
+                <div class="registros">
+                    <table id="tabla-registros">
+                        <thead>
+                            <tr>
+                                <th>Día</th>
+                                <th>Fecha</th>
+                                <th>Entrada Mañana</th>
+                                <th>Salida Mañana</th>
+                                <th>Horas Mañana</th>
+                                <th>Entrada Tarde</th>
+                                <th>Salida Tarde</th>
+                                <th>Horas Tarde</th>
+                                <th>Total Día</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cuerpo-tabla">
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 25px; color: var(--color-text-muted);">
+                                    Cargando registros...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-top: 30px; padding: 20px; background: var(--color-tertiary); border-radius: var(--radius); border: 1px solid var(--color-border);">
+                    <h3 style="color: var(--color-warning); text-align: center; margin-bottom: 20px; font-size: 1.2rem;">
+                        <i class="fas fa-calculator"></i> Resumen de Pagos
+                    </h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        <div>
+                            <label>Total Horas Trabajadas:</label>
+                            <input type="text" id="total-horas" readonly style="background: rgba(76, 175, 80, 0.1); font-weight: bold; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
+                        </div>
+                        <div>
+                            <label>Total a Pagar:</label>
+                            <input type="text" id="total-pagar" readonly style="background: rgba(76, 175, 80, 0.1); font-weight: bold; width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--color-border);">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Sistema de Registro de Turnos - Editorial Binomio</p>
+            <p style="margin-top: 10px; font-size: 0.85rem; color: var(--color-text-muted);">
+                <i class="fas fa-user-tie"></i> Desarrollado por: Marco Maidana | 
+                <i class="fas fa-cloud"></i> Almacenamiento en la nube: Firebase
+            </p>
+        </footer>
+    </div>
+
+    <!-- Modal para selección de usuario -->
+    <div class="modal" id="usuario-modal">
+        <div class="modal-content">
+            <h3><i class="fas fa-user"></i> Seleccionar Usuario</h3>
+            <p style="color: var(--color-text-muted); margin-bottom: 20px;">Elige tu nombre o crea uno nuevo:</p>
+            
+            <div class="usuarios-lista" id="lista-usuarios" style="background: var(--color-tertiary); padding: 16px; border-radius: 8px; max-height: 300px; overflow-y: auto;">
+                <div style="text-align: center; color: var(--color-text-muted); padding: 20px;">Cargando usuarios...</div>
+            </div>
+            
+            <div class="form-group" style="margin-top: 20px;">
+                <label for="nuevo-usuario"><i class="fas fa-plus"></i> Crear Nuevo Usuario:</label>
+                <input type="text" id="nuevo-usuario" placeholder="Ingresa tu nombre completo">
+            </div>
+            
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" id="crear-usuario">Crear Usuario</button>
+                <button class="modal-btn cancel" id="cerrar-modal">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de confirmación para limpiar mes -->
+    <div class="modal" id="confirmar-limpiar-modal">
+        <div class="modal-content">
+            <h3><i class="fas fa-exclamation-triangle" style="color: var(--color-danger);"></i> LIMPIAR MES</h3>
+            <p style="color: var(--color-text); margin-bottom: 20px; text-align: center; font-size: 1.1rem;">
+                ¿Estás seguro de eliminar TODOS los registros del mes actual para el usuario <strong id="usuario-limpiar"></strong>?
+            </p>
+            <p style="color: var(--color-text-muted); margin-bottom: 20px; text-align: center;">
+                Esta acción no se puede deshacer. Se recomienda exportar antes.
+            </p>
+            <div class="modal-buttons">
+                <button class="modal-btn confirm" id="confirmar-limpiar-si">SÍ, LIMPIAR</button>
+                <button class="modal-btn cancel" id="confirmar-limpiar-no">CANCELAR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // SISTEMA PRINCIPAL - OPTIMIZADO PARA TODOS LOS DISPOSITIVOS
+        // ============================================
+        
+        // Configuración del sistema
+        let usuarios = [];
+        let usuarioActual = null;
+        let registros = [];
+        let usuarioGoogle = null;
+        let datosEnLaNube = false;
+        let fcmToken = null;
+        
+        // Contraseña de desarrollador
+        const PASSWORD_DEVELOPER = "menuruchan2";
+        
+        // Días de la semana en español
+        const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        
+        // Mensajes de notificación por categoría
+        const mensajesNotificacion = {
+            entradaManana: [
+                "🌅 Ya es hora de trabajar... 😔 El búho ya tomó su café, ¿y tú?",
+                "Son las 8:45 AM. En la editorial ya se escuchan teclados. ¿Tú aún en pijama? 😔",
+                "Otro día, otro turno. Vamos, que el café de la máquina te espera. 😔",
+                "Respira hondo... el fin de semana pasará volando. Solo registra tu entrada. 😔",
+                "Tu compañero de la tarde aún duerme, pero tú eres de mañana. A sufrir. 😔",
+                "Las páginas no se escriben solas, y tu turno no se registra solo. Entra ya. 😔",
+                "🏔️ La montaña de trabajo te espera. El primer paso: fichar entrada.",
+                "Sabemos que preferirías estar en la cama. Pero el sistema no se va a llenar mágicamente. 😔",
+                "La cafetera ya está lista. Tu registro de entrada, no. 😔",
+                "🥲 Es lunes. Ya duele. No empeores las cosas olvidando fichar."
+            ],
+            salidaManana: [
+                "🏁 ¡Ya va siendo hora de salir! 😄 ¿Qué logramos hoy?",
+                "📚 ¿Sobreviviste a la mañana? Cuéntanos: ¿cuántas páginas editaste?",
+                "🕊️ El búho te suelta las alas. Registra tu salida y vuela a casa.",
+                "La mañana fue dura, pero el almuerzo te espera. Marca salida y ¡a disfrutar!",
+                "📊 Otro turno completado. El sistema ya suma tus horas para la quincena.",
+                "🏃 Dejas el testigo al turno tarde. Pero primero... ¡registra tu salida!",
+                "Te ganaste el almuerzo, el sofá o lo que sea que hagas. Ficha y vete.",
+                "🤔 ¿Qué aprendizaje te llevas de esta mañana? (Además de que odias madrugar)",
+                "⏳ Llevas X horas trabajadas esta mañana. ¿Te alcanzó para todo?",
+                "🎉 Si es viernes: ¡Último esfuerzo! La libertad editorial te espera."
+            ],
+            entradaTarde: [
+                "🥱 Ya es hora de trabajar (otra vez). ¿Dormiste la siesta? Esperemos que sí.",
+                "¿Comiste mucho? Te espera una tarde movida. Mejor registra tu entrada y activa.",
+                "Los de la mañana ya se fueron. Ahora te toca brillar a ti. 🌟",
+                "La jornada continúa. El búho ya dejó el café y pasó al té. Entra ya.",
+                "☀️ Afuera hay sol, pero adentro hay trabajo. Registra tu entrada y a darle.",
+                "La mañana no fue tuya, pero la tarde puede serlo. Empieza bien.",
+                "Se acabó el descanso. Vuelve a la trinchera. 😔",
+                "¿Podrás superar a los de la mañana en productividad? Primero: ficha entrada.",
+                "Si aún estás digiriendo, puedes fichar sentado. No hay excusas.",
+                "¡Tú puedes! (aunque sepamos que preferirías estar en casa)"
+            ],
+            salidaTarde: [
+                "🌆 ¡Ya va siendo hora de salir! 😄 ¿Qué logramos hoy en la tarde?",
+                "🌙 La ciudad se enciende y tú te vas a casa. Registra tu salida y a disfrutar.",
+                "¿La tarde fue productiva o solo miraste el reloj? Cuéntanos con tu fichaje.",
+                "Si trabajaste hasta tarde, te ganaste el descanso doble. Marca y vete.",
+                "¿Qué misterio resolviste hoy en la editorial? (O qué lío dejaste para mañana)",
+                "Ahora sí, la editorial cierra... pero solo después de tu registro de salida.",
+                "🍻 Si es viernes: ¡Finde! Corre, huye, pero antes ficha.",
+                "La cena te espera. El sistema también. No la hagas esperar a ella.",
+                "📝 Resumen del día: Entraste, trabajaste, (quizás sufriste), y ahora sales. Regístralo.",
+                "Cada salida es un pequeño logro. Mañana será otro día. Pero hoy, ya fue. 🥂"
+            ]
+        };
+        
+        // Variables para optimización
+        let isProcessing = false;
+        
+        // ============================================
+        // FUNCIONES PRINCIPALES
+        // ============================================
+        
+        // Obtener fecha y hora actual
+        function obtenerFechaHora() {
+            const ahora = new Date();
+            const año = ahora.getFullYear();
+            const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+            const dia = String(ahora.getDate()).padStart(2, '0');
+            const fecha = `${año}-${mes}-${dia}`;
+            const hora = ahora.toTimeString().split(' ')[0].substring(0, 5);
+            const diaSemana = diasSemana[ahora.getDay()];
+            
+            return { fecha, hora, diaSemana };
+        }
+        
+        // Actualizar hora en pantalla
+        function actualizarHora() {
+            const ahora = new Date();
+            const opciones = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            };
+            document.getElementById('current-time').textContent = 
+                `🕒 ${ahora.toLocaleDateString('es-ES', opciones)}`;
+        }
+        
+        // Guardar en localStorage
+        function guardarEnLocalStorage(clave, valor) {
+            try {
+                localStorage.setItem(clave, JSON.stringify(valor));
+                return true;
+            } catch (e) {
+                console.error('Error guardando en localStorage:', e);
+                return false;
+            }
+        }
+        
+        // Cargar desde localStorage
+        function cargarDesdeLocalStorage(clave, valorPorDefecto) {
+            try {
+                const valor = localStorage.getItem(clave);
+                return valor ? JSON.parse(valor) : valorPorDefecto;
+            } catch (e) {
+                console.error('Error cargando desde localStorage:', e);
+                return valorPorDefecto;
+            }
+        }
+        
+        // Mostrar mensaje de estado
+        function mostrarMensaje(texto, tipo = 'success') {
+            const elemento = document.getElementById('status-message');
+            elemento.textContent = texto;
+            elemento.className = 'status';
+            elemento.classList.add(tipo === 'success' ? 'status-success' : 'status-error');
+            elemento.style.display = 'block';
+            
+            // Scroll suave al mensaje
+            elemento.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            
+            setTimeout(() => {
+                elemento.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Actualizar estado de la nube
+        function actualizarEstadoNube(conectado, mensaje = '') {
+            const cloudStatus = document.getElementById('cloud-status');
+            const cloudStatusText = document.getElementById('cloud-status-text');
+            
+            if (conectado) {
+                cloudStatus.className = 'cloud-status cloud-connected';
+                cloudStatusText.textContent = mensaje || 'Conectado a la nube';
+            } else {
+                cloudStatus.className = 'cloud-status cloud-disconnected';
+                cloudStatusText.textContent = mensaje || 'Desconectado';
+            }
+        }
+        
+        // ============================================
+        // FUNCIONES DE FIREBASE CLOUD MESSAGING
+        // ============================================
+        
+        // Solicitar permiso y obtener token FCM
+        async function solicitarPermisoNotificaciones() {
+            try {
+                // Solicitar permiso de notificaciones
+                const permission = await Notification.requestPermission();
+                
+                if (permission === 'granted') {
+                    // Obtener token FCM
+                    const token = await getToken(window.firebaseMessaging, {
+                        vapidKey: window.firebaseVapidKey
+                    });
+                    
+                    if (token) {
+                        fcmToken = token;
+                        document.getElementById('token-display').innerHTML = 
+                            `✅ Token FCM: <span style="color: #4CAF50;">${token.substring(0, 30)}...</span>`;
+                        
+                        // Guardar token en Firestore si hay usuario autenticado
+                        if (usuarioGoogle) {
+                            await firebaseSetDoc(
+                                firebaseDoc(window.firebaseDb, 'fcm_tokens', usuarioGoogle.uid),
+                                {
+                                    token: token,
+                                    usuario: usuarioActual,
+                                    fecha: serverTimestamp(),
+                                    dispositivo: navigator.userAgent
+                                }
+                            );
+                        }
+                        
+                        // Guardar en localStorage
+                        guardarEnLocalStorage('fcm_token', token);
+                        
+                        // Iniciar programación de notificaciones
+                        programarNotificaciones();
+                        
+                        mostrarMensaje('✅ Notificaciones activadas correctamente', 'success');
+                    } else {
+                        document.getElementById('token-display').innerHTML = 
+                            '❌ No se pudo obtener el token FCM';
+                    }
+                } else {
+                    document.getElementById('token-display').innerHTML = 
+                        '❌ Permiso de notificaciones denegado';
+                }
+            } catch (error) {
+                console.error('Error solicitando permiso FCM:', error);
+                document.getElementById('token-display').innerHTML = 
+                    `❌ Error: ${error.message}`;
+            }
+        }
+        
+        // Programar notificaciones según horarios
+        function programarNotificaciones() {
+            // Horarios: 08:45, 12:45, 14:15, 18:45
+            const horarios = [
+                { hora: 8, minuto: 45, categoria: 'entradaManana', titulo: '🌅 TURNO MAÑANA - ENTRADA' },
+                { hora: 12, minuto: 45, categoria: 'salidaManana', titulo: '🏁 TURNO MAÑANA - SALIDA' },
+                { hora: 14, minuto: 15, categoria: 'entradaTarde', titulo: '☀️ TURNO TARDE - ENTRADA' },
+                { hora: 18, minuto: 45, categoria: 'salidaTarde', titulo: '🌙 TURNO TARDE - SALIDA' }
+            ];
+            
+            // Limpiar intervalos anteriores
+            if (window.notificationIntervals) {
+                window.notificationIntervals.forEach(interval => clearInterval(interval));
+            }
+            window.notificationIntervals = [];
+            
+            // Crear un intervalo que verifique cada minuto
+            const intervalo = setInterval(() => {
+                const ahora = new Date();
+                const horaActual = ahora.getHours();
+                const minutoActual = ahora.getMinutes();
+                
+                horarios.forEach(horario => {
+                    if (horaActual === horario.hora && minutoActual === horario.minuto) {
+                        // Enviar notificación
+                        const mensajeIndex = obtenerIndiceMensaje(horario.categoria);
+                        let mensaje = mensajesNotificacion[horario.categoria][mensajeIndex];
+                        
+                        // Reemplazar placeholder si es necesario
+                        if (horario.categoria === 'salidaManana' && mensaje.includes('X horas')) {
+                            const horasManana = calcularHorasMananaHoy();
+                            mensaje = mensaje.replace('X horas', horasManana.toFixed(1));
+                        }
+                        
+                        enviarNotificacionPush(horario.titulo, mensaje);
+                    }
+                });
+            }, 60000); // Revisar cada minuto
+            
+            window.notificationIntervals.push(intervalo);
+        }
+        
+        // Obtener índice de mensaje para hoy (cíclico basado en el día del mes)
+        function obtenerIndiceMensaje(categoria) {
+            const hoy = new Date();
+            const diaDelMes = hoy.getDate();
+            const longitudArray = mensajesNotificacion[categoria].length;
+            
+            // Guardar último índice usado para esta categoría
+            const key = `ultimo_indice_${categoria}`;
+            let ultimoIndice = parseInt(localStorage.getItem(key) || '0');
+            
+            // Si es un nuevo día, avanzar al siguiente índice
+            const ultimoDia = parseInt(localStorage.getItem(`ultimo_dia_${categoria}`) || '0');
+            if (ultimoDia !== diaDelMes) {
+                ultimoIndice = (ultimoIndice + 1) % longitudArray;
+                localStorage.setItem(key, ultimoIndice.toString());
+                localStorage.setItem(`ultimo_dia_${categoria}`, diaDelMes.toString());
+            }
+            
+            return ultimoIndice;
+        }
+        
+        // Calcular horas trabajadas en la mañana de hoy
+        function calcularHorasMananaHoy() {
+            const hoy = obtenerFechaHora().fecha;
+            let totalHoras = 0;
+            
+            registros.forEach(registro => {
+                if (registro.usuario === usuarioActual && 
+                    registro.fecha === hoy && 
+                    registro.turno === 'Mañana' && 
+                    registro.horas) {
+                    totalHoras += registro.horas;
+                }
+            });
+            
+            return totalHoras;
+        }
+        
+        // Enviar notificación push usando FCM
+        async function enviarNotificacionPush(titulo, cuerpo) {
+            if (!fcmToken) {
+                console.log('No hay token FCM disponible');
+                return;
+            }
+            
+            try {
+                // Guardar notificación en Firestore para que el service worker la envíe
+                if (usuarioGoogle) {
+                    await firebaseAddDoc(
+                        firebaseCollection(window.firebaseDb, 'notificaciones_pendientes'),
+                        {
+                            token: fcmToken,
+                            titulo: titulo,
+                            cuerpo: cuerpo,
+                            usuario: usuarioActual,
+                            fecha: serverTimestamp(),
+                            leida: false
+                        }
+                    );
+                }
+                
+                // También mostrar notificación local inmediata (para pruebas)
+                if ('Notification' in window && Notification.permission === 'granted') {
+                    new Notification(titulo, {
+                        body: cuerpo,
+                        icon: '/favicon.ico',
+                        badge: '/favicon.ico',
+                        vibrate: [200, 100, 200]
+                    });
+                }
+                
+                console.log('Notificación enviada:', titulo, cuerpo);
+            } catch (error) {
+                console.error('Error enviando notificación:', error);
+            }
+        }
+        
+        // Enviar notificación de prueba
+        function enviarNotificacionPrueba() {
+            const categorias = ['entradaManana', 'salidaManana', 'entradaTarde', 'salidaTarde'];
+            const categoria = categorias[Math.floor(Math.random() * categorias.length)];
+            const titulos = {
+                entradaManana: '🌅 TURNO MAÑANA - ENTRADA',
+                salidaManana: '🏁 TURNO MAÑANA - SALIDA',
+                entradaTarde: '☀️ TURNO TARDE - ENTRADA',
+                salidaTarde: '🌙 TURNO TARDE - SALIDA'
+            };
+            
+            const indice = Math.floor(Math.random() * mensajesNotificacion[categoria].length);
+            const mensaje = mensajesNotificacion[categoria][indice];
+            
+            enviarNotificacionPush(titulos[categoria], mensaje);
+            mostrarMensaje('📨 Notificación de prueba enviada', 'success');
+        }
+        
+        // ============================================
+        // FUNCIONES DE FIREBASE AUTH Y FIRESTORE
+        // ============================================
+        
+        // Iniciar sesión con Google
+        async function iniciarSesionGoogle() {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            try {
+                const provider = new GoogleAuthProvider();
+                const result = await signInWithPopup(window.firebaseAuth, provider);
+                
+                usuarioGoogle = result.user;
+                actualizarEstadoNube(true, `Conectado como ${usuarioGoogle.displayName}`);
+                mostrarMensaje(`✅ Sesión iniciada con Google: ${usuarioGoogle.displayName}`, 'success');
+                
+                document.getElementById('login-google').style.display = 'none';
+                document.getElementById('logout-google').style.display = 'flex';
+                
+                await cargarDatosDesdeLaNube();
+                
+                // Solicitar permiso de notificaciones automáticamente
+                if ('Notification' in window) {
+                    setTimeout(solicitarPermisoNotificaciones, 2000);
+                }
+            } catch (error) {
+                console.error('Error al iniciar sesión:', error);
+                mostrarMensaje('❌ Error al iniciar sesión con Google', 'error');
+            } finally {
+                isProcessing = false;
+            }
+        }
+        
+        // Cerrar sesión Google
+        async function cerrarSesionGoogle() {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            try {
+                await signOut(window.firebaseAuth);
+                usuarioGoogle = null;
+                actualizarEstadoNube(false, 'Desconectado');
+                mostrarMensaje('✅ Sesión cerrada correctamente', 'success');
+                
+                document.getElementById('logout-google').style.display = 'none';
+                document.getElementById('login-google').style.display = 'flex';
+                
+                // Recargar datos locales
+                cargarDatosIniciales();
+                actualizarTabla();
+            } catch (error) {
+                console.error('Error al cerrar sesión:', error);
+                mostrarMensaje('❌ Error al cerrar sesión', 'error');
+            } finally {
+                isProcessing = false;
+            }
+        }
+        
+        // Guardar datos en la nube
+        async function guardarDatosEnLaNube() {
+            if (!usuarioGoogle) {
+                actualizarEstadoNube(false, 'No hay usuario autenticado');
+                return false;
+            }
+            
+            try {
+                // Obtener todos los días del mes actual
+                const diasCompletosDelMes = generarDiasCompletosDelMes();
+                
+                const datosSistema = {
+                    usuarios: usuarios,
+                    registros: registros,
+                    usuarioActual: usuarioActual,
+                    salarioHora: document.getElementById('salario-hora').value,
+                    // Incluir todos los días del mes en el JSON
+                    diasCompletosDelMes: diasCompletosDelMes,
+                    fechaActualizacion: serverTimestamp()
+                };
+                
+                await firebaseSetDoc(firebaseDoc(window.firebaseDb, 'usuarios', usuarioGoogle.uid), datosSistema);
+                
+                // Guardar también el token FCM si existe
+                if (fcmToken) {
+                    await firebaseSetDoc(
+                        firebaseDoc(window.firebaseDb, 'fcm_tokens', usuarioGoogle.uid),
+                        {
+                            token: fcmToken,
+                            usuario: usuarioActual,
+                            fecha: serverTimestamp(),
+                            dispositivo: navigator.userAgent
+                        }
+                    );
+                }
+                
+                actualizarEstadoNube(true, 'Datos guardados en la nube');
+                return true;
+            } catch (error) {
+                console.error('Error guardando en la nube:', error);
+                actualizarEstadoNube(false, 'Error guardando en la nube');
+                return false;
+            }
+        }
+        
+        // Cargar datos desde la nube
+        async function cargarDatosDesdeLaNube() {
+            if (!usuarioGoogle) {
+                return false;
+            }
+            
+            try {
+                const docRef = firebaseDoc(window.firebaseDb, 'usuarios', usuarioGoogle.uid);
+                const docSnap = await firebaseGetDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    const datos = docSnap.data();
+                    
+                    usuarios = datos.usuarios || usuarios;
+                    registros = datos.registros || registros;
+                    usuarioActual = datos.usuarioActual || usuarioActual;
+                    
+                    if (datos.salarioHora) {
+                        document.getElementById('salario-hora').value = datos.salarioHora;
+                    }
+                    
+                    // Guardar también en localStorage como backup
+                    guardarEnLocalStorage('usuarios', usuarios);
+                    guardarEnLocalStorage('registros', registros);
+                    guardarEnLocalStorage('usuarioActual', usuarioActual);
+                    
+                    if (usuarioActual) {
+                        actualizarDisplayUsuario();
+                    } else {
+                        mostrarModalUsuario();
+                    }
+                    
+                    actualizarTabla();
+                    datosEnLaNube = true;
+                    actualizarEstadoNube(true, 'Datos cargados desde la nube');
+                    mostrarMensaje('✅ Datos sincronizados desde la nube', 'success');
+                    return true;
+                } else {
+                    // Crear perfil nuevo en la nube
+                    await guardarDatosEnLaNube();
+                    actualizarEstadoNube(true, 'Nuevo perfil creado en la nube');
+                    return true;
+                }
+            } catch (error) {
+                console.error('Error cargando desde la nube:', error);
+                actualizarEstadoNube(false, 'Error cargando desde la nube');
+                return false;
+            }
+        }
+        
+        // ============================================
+        // FUNCIONES DE USUARIO
+        // ============================================
+        
+        // Cargar datos iniciales
+        function cargarDatosIniciales() {
+            usuarios = cargarDesdeLocalStorage('usuarios', ['MARCO MAIDANA', 'JUAN PÉREZ', 'MARÍA GARCÍA']);
+            registros = cargarDesdeLocalStorage('registros', []);
+            usuarioActual = cargarDesdeLocalStorage('usuarioActual', null);
+            
+            // Recuperar token FCM si existe
+            fcmToken = cargarDesdeLocalStorage('fcm_token', null);
+            if (fcmToken) {
+                document.getElementById('token-display').innerHTML = 
+                    `✅ Token FCM: <span style="color: #4CAF50;">${fcmToken.substring(0, 30)}...</span>`;
+            }
+        }
+        
+        // Mostrar modal de usuario
+        function mostrarModalUsuario() {
+            actualizarListaUsuarios();
+            document.getElementById('usuario-modal').classList.add('active');
+            setTimeout(() => document.getElementById('nuevo-usuario').focus(), 100);
+        }
+        
+        // Actualizar lista de usuarios
+        function actualizarListaUsuarios() {
+            const lista = document.getElementById('lista-usuarios');
+            lista.innerHTML = '';
+            
+            if (usuarios.length === 0) {
+                lista.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--color-text-muted);">No hay usuarios. Crea el primero.</div>';
+                return;
+            }
+            
+            usuarios.forEach(usuario => {
+                const item = document.createElement('div');
+                item.className = 'usuario-item';
+                item.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--color-border);';
+                item.innerHTML = `
+                    <span>${usuario}</span>
+                    <button class="btn-seleccionar" data-usuario="${usuario}" 
+                            style="padding: 8px 16px; background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        Seleccionar
+                    </button>
+                `;
+                lista.appendChild(item);
+            });
+            
+            document.querySelectorAll('.btn-seleccionar').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const usuario = e.target.getAttribute('data-usuario');
+                    seleccionarUsuario(usuario);
+                });
+            });
+        }
+        
+        // Seleccionar usuario
+        async function seleccionarUsuario(usuario) {
+            usuarioActual = usuario;
+            guardarEnLocalStorage('usuarioActual', usuarioActual);
+            
+            if (usuarioGoogle) {
+                await guardarDatosEnLaNube();
+            }
+            
+            actualizarDisplayUsuario();
+            document.getElementById('usuario-modal').classList.remove('active');
+            actualizarTabla();
+            mostrarMensaje(`Usuario seleccionado: ${usuarioActual}`, 'success');
+        }
+        
+        // Crear nuevo usuario
+        async function crearUsuario() {
+            const nuevoUsuario = document.getElementById('nuevo-usuario').value.trim();
+            
+            if (nuevoUsuario) {
+                if (!usuarios.includes(nuevoUsuario)) {
+                    usuarios.push(nuevoUsuario);
+                    if (guardarEnLocalStorage('usuarios', usuarios)) {
+                        await seleccionarUsuario(nuevoUsuario);
+                        document.getElementById('nuevo-usuario').value = '';
+                    } else {
+                        mostrarMensaje('Error al guardar el usuario', 'error');
+                    }
+                } else {
+                    mostrarMensaje('Este usuario ya existe', 'error');
+                }
+            } else {
+                mostrarMensaje('Por favor, ingresa un nombre válido', 'error');
+            }
+        }
+        
+        // Actualizar display del usuario
+        function actualizarDisplayUsuario() {
+            document.getElementById('nombre-display').textContent = usuarioActual || 'No seleccionado';
+        }
+        
+        // ============================================
+        // FUNCIONES DE REGISTRO DE TURNOS
+        // ============================================
+        
+        // Calcular horas trabajadas
+        function calcularHoras(entrada, salida) {
+            if (!entrada || !salida) return 0;
+            
+            const [hEnt, mEnt] = entrada.split(':').map(Number);
+            const [hSal, mSal] = salida.split(':').map(Number);
+            
+            let horas = hSal - hEnt;
+            let minutos = mSal - mEnt;
+            
+            if (minutos < 0) {
+                horas--;
+                minutos += 60;
+            }
+            
+            if (horas < 0) horas += 24; // Para turnos nocturnos
+            
+            return horas + (minutos / 60);
+        }
+        
+        // Registrar turno
+        async function registrarTurno(turno, tipo) {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            if (!usuarioActual) {
+                mostrarMensaje('Primero debes seleccionar un usuario', 'error');
+                mostrarModalUsuario();
+                isProcessing = false;
+                return;
+            }
+            
+            const { fecha, hora, diaSemana } = obtenerFechaHora();
+            const salarioHora = parseFloat(document.getElementById('salario-hora').value) || 8.50;
+            
+            // Verificar si es domingo
+            if (diaSemana === 'Domingo') {
+                if (!confirm('⚠️ ¡Es Domingo! ¿Estás seguro de registrar turno?')) {
+                    isProcessing = false;
+                    return;
+                }
+            }
+            
+            // Buscar registro existente
+            let registroIndex = registros.findIndex(r => 
+                r.usuario === usuarioActual && 
+                r.fecha === fecha && 
+                r.turno === turno
+            );
+            
+            if (registroIndex === -1) {
+                // Nuevo registro
+                const nuevoRegistro = {
+                    usuario: usuarioActual,
+                    fecha,
+                    diaSemana,
+                    turno,
+                    entrada: tipo === 'Entrada' ? hora : '',
+                    salida: tipo === 'Salida' ? hora : '',
+                    horas: 0,
+                    total: 0
+                };
+                
+                if (tipo === 'Salida') {
+                    const entradaRegistro = registros.find(r => 
+                        r.usuario === usuarioActual && 
+                        r.fecha === fecha && 
+                        r.turno === turno && 
+                        r.entrada
+                    );
+                    if (entradaRegistro) {
+                        nuevoRegistro.entrada = entradaRegistro.entrada;
+                        nuevoRegistro.horas = calcularHoras(entradaRegistro.entrada, hora);
+                        nuevoRegistro.total = nuevoRegistro.horas * salarioHora;
+                    }
+                }
+                
+                registros.push(nuevoRegistro);
+            } else {
+                // Actualizar registro existente
+                const registro = registros[registroIndex];
+                
+                if (tipo === 'Entrada') {
+                    registro.entrada = hora;
+                } else {
+                    registro.salida = hora;
+                    if (registro.entrada) {
+                        registro.horas = calcularHoras(registro.entrada, hora);
+                        registro.total = registro.horas * salarioHora;
+                    }
+                }
+                
+                registro.diaSemana = diaSemana;
+            }
+            
+            // Guardar datos
+            if (guardarEnLocalStorage('registros', registros)) {
+                if (usuarioGoogle) {
+                    await guardarDatosEnLaNube();
+                }
+                
+                actualizarTabla();
+                
+                // Enviar notificación por WhatsApp
+                enviarWhatsApp(turno, tipo, fecha, hora);
+                
+                mostrarMensaje(`${tipo} ${turno} registrado correctamente`, 'success');
+            } else {
+                mostrarMensaje('Error al guardar el registro', 'error');
+            }
+            
+            isProcessing = false;
+        }
+        
+        // Enviar WhatsApp
+        function enviarWhatsApp(turno, tipo, fecha, hora) {
+            const mensaje = `📌 REGISTRO DE ASISTENCIA
+
+👤 Nombre: ${usuarioActual}
+📅 Fecha: ${fecha}
+⏰ Hora: ${hora}
+🟢 Tipo: ${tipo} ${turno}`;
+            
+            const numero = '+59163238887';
+            const mensajeCodificado = encodeURIComponent(mensaje);
+            const url = `https://wa.me/${numero}?text=${mensajeCodificado}`;
+            
+            window.open(url, '_blank');
+        }
+        
+        // ============================================
+        // FUNCIÓN: LIMPIAR REGISTROS DEL MES ACTUAL
+        // ============================================
+        async function limpiarRegistrosMesActual() {
+            if (!usuarioActual) {
+                mostrarMensaje('Debes seleccionar un usuario', 'error');
+                mostrarModalUsuario();
+                return;
+            }
+            
+            const ahora = new Date();
+            const año = ahora.getFullYear();
+            const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+            const nombreMes = meses[ahora.getMonth()];
+            
+            // Mostrar modal de confirmación
+            const modal = document.getElementById('confirmar-limpiar-modal');
+            document.getElementById('usuario-limpiar').textContent = `${usuarioActual} - ${nombreMes} ${año}`;
+            modal.classList.add('active');
+            
+            // Manejadores temporales
+            const confirmarBtn = document.getElementById('confirmar-limpiar-si');
+            const cancelarBtn = document.getElementById('confirmar-limpiar-no');
+            
+            const confirmHandler = async function() {
+                modal.classList.remove('active');
+                
+                // Filtrar registros: mantener los que NO son del usuario en este mes
+                const registrosNuevos = registros.filter(r => 
+                    !(r.usuario === usuarioActual && r.fecha.startsWith(`${año}-${mes}`))
+                );
+                
+                registros = registrosNuevos;
+                
+                // Guardar cambios
+                guardarEnLocalStorage('registros', registros);
+                if (usuarioGoogle) {
+                    await guardarDatosEnLaNube();
+                }
+                
+                actualizarTabla();
+                mostrarMensaje(`✅ Registros de ${nombreMes} ${año} eliminados correctamente`, 'success');
+                
+                // Enviar notificación de limpieza
+                enviarNotificacionPush(
+                    '🛠️ LIMPIEZA DE REGISTROS',
+                    `Vas a limpiar los registros del mes. Es como archivar un libro completo. ¿Estás seguro?`
+                );
+                
+                // Limpiar event listeners
+                confirmarBtn.removeEventListener('click', confirmHandler);
+                cancelarBtn.removeEventListener('click', cancelHandler);
+            };
+            
+            const cancelHandler = function() {
+                modal.classList.remove('active');
+                mostrarMensaje('Operación cancelada', 'error');
+                confirmarBtn.removeEventListener('click', confirmHandler);
+                cancelarBtn.removeEventListener('click', cancelHandler);
+            };
+            
+            confirmarBtn.addEventListener('click', confirmHandler, { once: true });
+            cancelarBtn.addEventListener('click', cancelHandler, { once: true });
+        }
+        
+        // ============================================
+        // FUNCIONES DE TABLA Y FILTROS
+        // ============================================
+        
+        // Generar todos los días del mes actual
+        function generarDiasCompletosDelMes() {
+            const ahora = new Date();
+            const año = ahora.getFullYear();
+            const mes = ahora.getMonth() + 1;
+            const diasEnMes = new Date(año, mes, 0).getDate();
+            const diasCompletos = [];
+            
+            for (let dia = 1; dia <= diasEnMes; dia++) {
+                const fechaStr = `${año}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+                const fechaObj = new Date(año, mes - 1, dia);
+                const diaSemana = diasSemana[fechaObj.getDay()];
+                
+                // Buscar registros para este día
+                const registrosDia = registros.filter(r => 
+                    r.usuario === usuarioActual && 
+                    r.fecha === fechaStr
+                );
+                
+                // Crear objeto día completo
+                const diaCompleto = {
+                    fecha: fechaStr,
+                    diaSemana: diaSemana,
+                    mañana: { entrada: '', salida: '', horas: 0 },
+                    tarde: { entrada: '', salida: '', horas: 0 }
+                };
+                
+                // Llenar con datos si existen
+                registrosDia.forEach(registro => {
+                    if (registro.turno === 'Mañana') {
+                        diaCompleto.mañana.entrada = registro.entrada || '';
+                        diaCompleto.mañana.salida = registro.salida || '';
+                        diaCompleto.mañana.horas = registro.horas || 0;
+                    } else if (registro.turno === 'Tarde') {
+                        diaCompleto.tarde.entrada = registro.entrada || '';
+                        diaCompleto.tarde.salida = registro.salida || '';
+                        diaCompleto.tarde.horas = registro.horas || 0;
+                    }
+                });
+                
+                diasCompletos.push(diaCompleto);
+            }
+            
+            return diasCompletos;
+        }
+        
+        // Actualizar tabla
+        function actualizarTabla() {
+            const tbody = document.getElementById('cuerpo-tabla');
+            const filtroMes = document.getElementById('filtro-mes').value;
+            
+            // Obtener todos los días del mes actual
+            const diasCompletos = generarDiasCompletosDelMes();
+            
+            // Filtrar por mes si se seleccionó
+            let diasMostrar = diasCompletos;
+            if (filtroMes !== 'todos') {
+                diasMostrar = diasCompletos.filter(dia => {
+                    const fechaObj = new Date(dia.fecha);
+                    const mesReg = fechaObj.getMonth() + 1;
+                    return mesReg.toString() === filtroMes;
+                });
+            }
+            
+            // Limpiar tabla
+            tbody.innerHTML = '';
+            
+            if (diasMostrar.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; padding: 25px; color: var(--color-text-muted);">
+                            No hay registros para mostrar
+                        </td>
+                    </tr>
+                `;
+                actualizarResumenPago(0, 0);
+                return;
+            }
+            
+            let totalHoras = 0;
+            let totalPagar = 0;
+            const salarioHora = parseFloat(document.getElementById('salario-hora').value) || 8.50;
+            
+            // Mostrar todos los días
+            diasMostrar.forEach(dia => {
+                const horasDia = dia.mañana.horas + dia.tarde.horas;
+                const totalDia = horasDia * salarioHora;
+                
+                totalHoras += horasDia;
+                totalPagar += totalDia;
+                
+                const fila = document.createElement('tr');
+                if (dia.diaSemana === 'Domingo') {
+                    fila.className = 'domingo';
+                }
+                
+                fila.innerHTML = `
+                    <td class="dia-semana">${dia.diaSemana}</td>
+                    <td>${dia.fecha}</td>
+                    <td>${dia.mañana.entrada || '-'}</td>
+                    <td>${dia.mañana.salida || '-'}</td>
+                    <td>${dia.mañana.horas > 0 ? dia.mañana.horas.toFixed(2) : '0.00'}</td>
+                    <td>${dia.tarde.entrada || '-'}</td>
+                    <td>${dia.tarde.salida || '-'}</td>
+                    <td>${dia.tarde.horas > 0 ? dia.tarde.horas.toFixed(2) : '0.00'}</td>
+                    <td><strong>$${totalDia.toFixed(2)}</strong></td>
+                `;
+                
+                tbody.appendChild(fila);
+            });
+            
+            // Actualizar resumen
+            actualizarResumenPago(totalHoras, totalPagar);
+            
+            // Actualizar filtro de meses
+            actualizarFiltroMeses();
+        }
+        
+        // Actualizar resumen de pagos
+        function actualizarResumenPago(totalHoras, totalPagar) {
+            document.getElementById('total-horas').value = `${totalHoras.toFixed(2)} horas`;
+            document.getElementById('total-pagar').value = `$${totalPagar.toFixed(2)}`;
+        }
+        
+        // Actualizar filtro de meses
+        function actualizarFiltroMeses() {
+            const select = document.getElementById('filtro-mes');
+            const mesesRegistrados = new Set();
+            
+            if (usuarioActual) {
+                registros.forEach(registro => {
+                    if (registro.usuario === usuarioActual) {
+                        const fecha = new Date(registro.fecha);
+                        const mes = fecha.getMonth() + 1;
+                        mesesRegistrados.add(mes);
+                    }
+                });
+            }
+            
+            const valorActual = select.value;
+            
+            select.innerHTML = '<option value="todos">Todos los meses</option>';
+            
+            Array.from(mesesRegistrados).sort().forEach(mes => {
+                const option = document.createElement('option');
+                option.value = mes;
+                option.textContent = meses[mes - 1];
+                select.appendChild(option);
+            });
+            
+            if (valorActual && Array.from(mesesRegistrados).includes(parseInt(valorActual))) {
+                select.value = valorActual;
+            }
+        }
+        
+        // ============================================
+        // FUNCIONES DE IMPORTACIÓN/EXPORTACIÓN
+        // ============================================
+        
+        // Exportar sistema
+        function exportarSistema() {
+            if (isProcessing) return;
+            isProcessing = true;
+            
+            try {
+                const diasCompletosDelMes = generarDiasCompletosDelMes();
+                
+                const datosExportacion = {
+                    metadata: {
+                        nombreSistema: "Sistema de Registro de Turnos - Editorial Binomio",
+                        fechaExportacion: new Date().toISOString(),
+                        version: "2.5",
+                        usuarioActual: usuarioActual,
+                        salarioHora: parseFloat(document.getElementById('salario-hora').value) || 8.50
+                    },
+                    usuarios: usuarios,
+                    registrosOriginales: registros,
+                    diasCompletosDelMes: diasCompletosDelMes,
+                    resumenMesActual: {
+                        totalHoras: 0,
+                        totalPagar: 0,
+                        diasTrabajados: 0,
+                        diasSinTrabajar: 0,
+                        diasDetalle: []
+                    }
+                };
+                
+                let totalHorasMes = 0;
+                let totalPagarMes = 0;
+                let diasTrabajados = 0;
+                
+                diasCompletosDelMes.forEach(dia => {
+                    const horasDia = dia.mañana.horas + dia.tarde.horas;
+                    const totalDia = horasDia * datosExportacion.metadata.salarioHora;
+                    
+                    totalHorasMes += horasDia;
+                    totalPagarMes += totalDia;
+                    
+                    const trabajoDia = {
+                        fecha: dia.fecha,
+                        diaSemana: dia.diaSemana,
+                        trabajoRealizado: horasDia > 0,
+                        horasTrabajadas: horasDia,
+                        totalDia: totalDia,
+                        detalle: {
+                            mañana: dia.mañana,
+                            tarde: dia.tarde
+                        }
+                    };
+                    
+                    datosExportacion.resumenMesActual.diasDetalle.push(trabajoDia);
+                    
+                    if (horasDia > 0) diasTrabajados++;
+                });
+                
+                const totalDiasMes = diasCompletosDelMes.length;
+                
+                datosExportacion.resumenMesActual.totalHoras = totalHorasMes;
+                datosExportacion.resumenMesActual.totalPagar = totalPagarMes;
+                datosExportacion.resumenMesActual.diasTrabajados = diasTrabajados;
+                datosExportacion.resumenMesActual.diasSinTrabajar = totalDiasMes - diasTrabajados;
+                
+                const datosJSON = JSON.stringify(datosExportacion, null, 2);
+                const blob = new Blob([datosJSON], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const ahora = new Date();
+                const año = ahora.getFullYear();
+                const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+                const nombreArchivo = `registro_turnos_${usuarioActual}_${año}_${mes}_completo.json`;
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = nombreArchivo;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Enviar notificación de backup
+                enviarNotificacionPush(
+                    '🛠️ BACKUP REALIZADO',
+                    'Exportar el sistema es como tener una copia de seguridad del Quijote. ¡Bien hecho!'
+                );
+                
+                mostrarMensaje('✅ Sistema exportado con TODOS los días del mes', 'success');
+            } catch (error) {
+                console.error('Error al exportar:', error);
+                mostrarMensaje('❌ Error al exportar el sistema', 'error');
+            } finally {
+                isProcessing = false;
+            }
+        }
+        
+        // Importar sistema
+        function importarSistema() {
+            if (isProcessing) return;
+            
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = async function(event) {
+                isProcessing = true;
+                const file = event.target.files[0];
+                if (!file) {
+                    isProcessing = false;
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const datosImportados = JSON.parse(e.target.result);
+                        
+                        if (!datosImportados.usuarios || !datosImportados.registrosOriginales) {
+                            throw new Error('Archivo JSON no válido');
+                        }
+                        
+                        if (confirm('¿Estás seguro de importar estos datos?\nSe sobrescribirán los datos actuales.')) {
+                            usuarios = datosImportados.usuarios;
+                            registros = datosImportados.registrosOriginales;
+                            usuarioActual = datosImportados.metadata?.usuarioActual || usuarioActual;
+                            
+                            if (datosImportados.metadata?.salarioHora) {
+                                document.getElementById('salario-hora').value = datosImportados.metadata.salarioHora;
+                            }
+                            
+                            guardarEnLocalStorage('usuarios', usuarios);
+                            guardarEnLocalStorage('registros', registros);
+                            guardarEnLocalStorage('usuarioActual', usuarioActual);
+                            
+                            if (usuarioGoogle) {
+                                await guardarDatosEnLaNube();
+                            }
+                            
+                            if (usuarioActual) actualizarDisplayUsuario();
+                            actualizarTabla();
+                            
+                            mostrarMensaje('✅ Sistema importado correctamente', 'success');
+                        }
+                    } catch (error) {
+                        console.error('Error al importar:', error);
+                        mostrarMensaje('❌ Error al importar el archivo JSON', 'error');
+                    } finally {
+                        isProcessing = false;
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        // ============================================
+        // FUNCIONES DE DESARROLLADOR
+        // ============================================
+        
+        function mostrarPanelDesarrollador() {
+            document.getElementById('password-modal').classList.add('active');
+            document.getElementById('password-input').value = '';
+            document.getElementById('password-error').style.display = 'none';
+            document.getElementById('password-input').focus();
+        }
+        
+        function verificarPassword() {
+            const passwordInput = document.getElementById('password-input').value;
+            const passwordError = document.getElementById('password-error');
+            
+            if (passwordInput === PASSWORD_DEVELOPER) {
+                document.getElementById('password-modal').classList.remove('active');
+                document.getElementById('dev-panel').style.display = 'block';
+                
+                const codigoGuardado = localStorage.getItem('codigo_mejoras');
+                if (codigoGuardado) {
+                    document.getElementById('dev-code').value = codigoGuardado;
+                }
+                
+                // Enviar notificación de desarrollador
+                enviarNotificacionPush(
+                    '🛠️ PANEL DE DESARROLLADOR',
+                    'Alguien tocó el panel de desarrollador. Espero que sea para mejorar algo...'
+                );
+                
+                mostrarMensaje('🔓 Acceso concedido al panel de desarrollador', 'success');
+            } else {
+                passwordError.style.display = 'block';
+                document.getElementById('password-input').value = '';
+                document.getElementById('password-input').focus();
+            }
+        }
+        
+        function implementarMejoras() {
+            const codigo = document.getElementById('dev-code').value.trim();
+            const devStatus = document.getElementById('dev-status');
+            
+            if (!codigo) {
+                devStatus.textContent = '❌ No hay código para implementar';
+                devStatus.style.display = 'block';
+                devStatus.style.background = 'rgba(244, 67, 54, 0.15)';
+                devStatus.style.border = '2px solid var(--color-danger)';
+                devStatus.style.color = '#FFCDD2';
+                return;
+            }
+            
+            try {
+                localStorage.setItem('codigo_mejoras', codigo);
+                eval(codigo);
+                
+                devStatus.textContent = '✅ Mejoras implementadas exitosamente';
+                devStatus.style.display = 'block';
+                devStatus.style.background = 'rgba(76, 175, 80, 0.15)';
+                devStatus.style.border = '2px solid var(--color-accent)';
+                devStatus.style.color = '#C8E6C9';
+                
+                mostrarMensaje('🚀 Mejoras implementadas en tiempo real', 'success');
+            } catch (error) {
+                devStatus.textContent = `❌ Error: ${error.message}`;
+                devStatus.style.display = 'block';
+                devStatus.style.background = 'rgba(244, 67, 54, 0.15)';
+                devStatus.style.border = '2px solid var(--color-danger)';
+                devStatus.style.color = '#FFCDD2';
+                console.error('Error en código:', error);
+            }
+        }
+        
+        function restaurarSistema() {
+            if (confirm('⚠️ ¿Restaurar sistema a valores por defecto?\n\nEsto eliminará las mejoras personalizadas pero NO los datos de usuarios y registros.')) {
+                localStorage.removeItem('codigo_mejoras');
+                document.getElementById('dev-code').value = '';
+                document.getElementById('dev-status').textContent = '✅ Sistema restaurado a valores por defecto';
+                document.getElementById('dev-status').style.display = 'block';
+                document.getElementById('dev-status').style.background = 'rgba(255, 152, 0, 0.15)';
+                document.getElementById('dev-status').style.border = '2px solid var(--color-warning)';
+                document.getElementById('dev-status').style.color = '#FFF9C4';
+                
+                mostrarMensaje('🔧 Sistema restaurado a configuración original', 'success');
+            }
+        }
+        
+        // ============================================
+        // CLASE FESTIVIDADES BOLIVIA (AUTOMÁTICA - SIN BOTÓN)
+        // ============================================
+        class EditorialBinomioFestividades {
+            constructor() {
+                this.canvas = null;
+                this.ctx = null;
+                this.particles = [];
+                this.animationId = null;
+                this.mouse = { x: null, y: null };
+                this.colors = {
+                    bolivia: ['#e94560', '#ffd700', '#0f3460', '#ffffff'],
+                    carnival: ['#e94560', '#ffd700', '#ff6b9d', '#c44569', '#f8b500'],
+                    skulls: ['#e94560', '#ffd700', '#ff6b35', '#f7931e', '#ff8c42'],
+                    christmas: ['#165B33', '#146B3A', '#ffd700', '#e94560', '#ffffff'],
+                    fireworks: ['#ffd700', '#e94560', '#ff6b9d', '#00d9ff', '#ffffff'],
+                    fire: ['#ff4500', '#ffd700', '#e94560', '#ff8c00', '#ff6347']
+                };
+                
+                this.festividades = [
+                    { nombre: "Año Nuevo", mes: 0, dia: 1, tipo: "civil", tema: "fireworks" },
+                    { nombre: "Carnaval de Oruro", tipo: "movil", calcular: this.getCarnaval, tema: "carnival" },
+                    { nombre: "Carnaval (Lunes)", tipo: "movil", calcular: this.getCarnavalLunes, tema: "carnival" },
+                    { nombre: "Carnaval (Martes)", tipo: "movil", calcular: this.getCarnavalMartes, tema: "carnival" },
+                    { nombre: "Día del Mar", mes: 2, dia: 23, tipo: "patriotico", tema: "bolivia" },
+                    { nombre: "Viernes Santo", tipo: "movil", calcular: this.getViernesSanto, tema: "bolivia" },
+                    { nombre: "Día del Trabajo", mes: 4, dia: 1, tipo: "civil", tema: "bolivia" },
+                    { nombre: "Corpus Christi", tipo: "movil", calcular: this.getCorpusChristi, tema: "bolivia" },
+                    { nombre: "Año Nuevo Andino", mes: 5, dia: 21, tipo: "tradicional", tema: "fire" },
+                    { nombre: "San Juan", mes: 5, dia: 24, tipo: "tradicional", tema: "fire" },
+                    { nombre: "Día de la Independencia", mes: 7, dia: 6, tipo: "patriotico", tema: "bolivia" },
+                    { nombre: "Urkupiña", mes: 7, dia: 15, tipo: "religioso", tema: "bolivia" },
+                    { nombre: "Día de los Difuntos", mes: 10, dia: 2, tipo: "tradicional", tema: "skulls" },
+                    { nombre: "Navidad", mes: 11, dia: 25, tipo: "religioso", tema: "christmas" }
+                ];
+                
+                this.init();
+            }
+
+            getPascua(year) {
+                const a = year % 19;
+                const b = Math.floor(year / 100);
+                const c = year % 100;
+                const d = Math.floor(b / 4);
+                const e = b % 4;
+                const f = Math.floor((b + 8) / 25);
+                const g = Math.floor((b - f + 1) / 3);
+                const h = (19 * a + b - d - g + 15) % 30;
+                const i = Math.floor(c / 4);
+                const k = c % 4;
+                const l = (32 + 2 * e + 2 * i - h - k) % 7;
+                const m = Math.floor((a + 11 * h + 22 * l) / 451);
+                const month = Math.floor((h + l - 7 * m + 114) / 31) - 1;
+                const day = ((h + l - 7 * m + 114) % 31) + 1;
+                return new Date(year, month, day);
+            }
+
+            getCarnaval(year) { return new Date(this.getPascua(year).getTime() - 49 * 86400000); }
+            getCarnavalLunes(year) { return new Date(this.getCarnaval(year).getTime() + 86400000); }
+            getCarnavalMartes(year) { return new Date(this.getCarnaval(year).getTime() + 172800000); }
+            getViernesSanto(year) { return new Date(this.getPascua(year).getTime() - 2 * 86400000); }
+            getCorpusChristi(year) { return new Date(this.getPascua(year).getTime() + 60 * 86400000); }
+
+            verificarHoy() {
+                const hoy = new Date();
+                const year = hoy.getFullYear();
+                
+                for (let fest of this.festividades) {
+                    let fechaFest;
+                    if (fest.tipo === 'movil') {
+                        fechaFest = fest.calcular.call(this, year);
+                    } else {
+                        fechaFest = new Date(year, fest.mes, fest.dia);
+                    }
+                    
+                    if (this.esMismaFecha(hoy, fechaFest)) {
+                        return fest;
+                    }
+                }
+                return null;
+            }
+
+            esMismaFecha(f1, f2) {
+                return f1.getDate() === f2.getDate() && 
+                       f1.getMonth() === f2.getMonth() && 
+                       f1.getFullYear() === f2.getFullYear();
+            }
+
+            init() {
+                // Inicialización automática al cargar la página
+                window.addEventListener('DOMContentLoaded', () => {
+                    const festividad = this.verificarHoy();
+                    if (festividad) {
+                        // Pequeño retraso para no interferir con la carga principal
+                        setTimeout(() => this.mostrarDoodle(festividad), 1000);
+                        
+                        // Enviar notificación de festividad
+                        setTimeout(() => {
+                            enviarNotificacionPush(
+                                `🎉 ${festividad.nombre}`,
+                                `Hoy es ${festividad.nombre}. ¡La Editorial Binomio celebra contigo!`
+                            );
+                        }, 2000);
+                    }
+                });
+                
+                // También verificar cada hora por si cambia el día
+                setInterval(() => {
+                    const festividad = this.verificarHoy();
+                    if (festividad) {
+                        this.mostrarDoodle(festividad);
+                    }
+                }, 3600000); // Cada hora
+            }
+
+            mostrarDoodle(festividad) {
+                // Cerrar doodle anterior si existe
+                if (this.overlay) this.cerrar();
+                
+                this.crearOverlay();
+                this.crearCanvas();
+                this.crearUI(festividad);
+                this.iniciarAnimacion(festividad.tema);
+                
+                // Auto-cerrar después de 12 segundos
+                this.autoCloseTimer = setTimeout(() => this.cerrar(), 12000);
+                
+                // Si el usuario hace clic en algún lado, extender tiempo
+                document.addEventListener('click', () => {
+                    clearTimeout(this.autoCloseTimer);
+                    this.autoCloseTimer = setTimeout(() => this.cerrar(), 5000);
+                }, { once: true });
+            }
+
+            crearOverlay() {
+                this.overlay = document.createElement('div');
+                this.overlay.className = 'doodle-overlay';
+                this.overlay.innerHTML = `
+                    <div class="doodle-background">
+                        <div class="gradient-orb orb-1"></div>
+                        <div class="gradient-orb orb-2"></div>
+                        <div class="gradient-orb orb-3"></div>
+                    </div>
+                `;
+                document.body.appendChild(this.overlay);
+            }
+
+            crearCanvas() {
+                this.canvas = document.createElement('canvas');
+                this.canvas.className = 'doodle-canvas';
+                this.ctx = this.canvas.getContext('2d');
+                this.resizeCanvas();
+                this.overlay.appendChild(this.canvas);
+                
+                window.addEventListener('resize', () => this.resizeCanvas());
+                this.canvas.addEventListener('mousemove', (e) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    this.mouse.x = e.clientX - rect.left;
+                    this.mouse.y = e.clientY - rect.top;
+                });
+                this.canvas.addEventListener('mouseleave', () => {
+                    this.mouse.x = null;
+                    this.mouse.y = null;
+                });
+            }
+
+            resizeCanvas() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+            }
+
+            crearUI(festividad) {
+                const ui = document.createElement('div');
+                ui.className = 'doodle-ui';
+                ui.innerHTML = `
+                    <div class="editorial-container">
+                        <div class="doodle-letter" style="--delay: 0s">E</div>
+                        <div class="doodle-letter" style="--delay: 0.08s">D</div>
+                        <div class="doodle-letter" style="--delay: 0.16s">I</div>
+                        <div class="doodle-letter" style="--delay: 0.24s">T</div>
+                        <div class="doodle-letter" style="--delay: 0.32s">O</div>
+                        <div class="doodle-letter" style="--delay: 0.40s">R</div>
+                        <div class="doodle-letter" style="--delay: 0.48s">I</div>
+                        <div class="doodle-letter" style="--delay: 0.56s">A</div>
+                        <div class="doodle-letter" style="--delay: 0.64s">L</div>
+                    </div>
+                    <div class="binomio-container">
+                        <div class="binomio-letter" style="--delay: 0.8s">B</div>
+                        <div class="binomio-letter" style="--delay: 0.9s">I</div>
+                        <div class="binomio-letter" style="--delay: 1.0s">N</div>
+                        <div class="binomio-letter" style="--delay: 1.1s">O</div>
+                        <div class="binomio-letter" style="--delay: 1.2s">M</div>
+                        <div class="binomio-letter" style="--delay: 1.3s">I</div>
+                        <div class="binomio-letter" style="--delay: 1.4s">O</div>
+                    </div>
+                    <div class="festividad-badge">
+                        <div class="festividad-texto">${festividad.nombre}</div>
+                        <div class="festividad-sub">Editorial Binomio celebra contigo</div>
+                    </div>
+                `;
+                
+                const closeBtn = document.createElement('button');
+                closeBtn.className = 'doodle-close';
+                closeBtn.innerHTML = '×';
+                closeBtn.onclick = () => this.cerrar();
+                
+                const shareBtn = document.createElement('button');
+                shareBtn.className = 'doodle-share';
+                shareBtn.innerHTML = '↗ Compartir';
+                shareBtn.onclick = () => this.compartir(festividad);
+                
+                this.overlay.appendChild(ui);
+                this.overlay.appendChild(closeBtn);
+                this.overlay.appendChild(shareBtn);
+            }
+
+            iniciarAnimacion(tema) {
+                this.particles = [];
+                const colors = this.colors[tema] || this.colors.bolivia;
+                
+                for (let i = 0; i < 120; i++) {
+                    this.particles.push(this.crearParticula(tema, colors));
+                }
+                
+                this.animate();
+            }
+
+            crearParticula(tema, colors) {
+                const canvas = this.canvas;
+                const base = {
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 15 + 5,
+                    speedX: (Math.random() - 0.5) * 1.5,
+                    speedY: (Math.random() - 0.5) * 1.5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    opacity: Math.random() * 0.5 + 0.3,
+                    rotation: Math.random() * Math.PI * 2,
+                    rotationSpeed: (Math.random() - 0.5) * 0.05
+                };
+
+                switch(tema) {
+                    case 'carnival':
+                        return {
+                            ...base,
+                            type: 'confetti',
+                            size: Math.random() * 12 + 6,
+                            speedY: Math.random() * 2 + 0.5,
+                            wobble: Math.random() * Math.PI * 2
+                        };
+                    case 'skulls':
+                        return {
+                            ...base,
+                            type: 'skull',
+                            size: Math.random() * 20 + 12,
+                            pulse: Math.random() * Math.PI
+                        };
+                    case 'fireworks':
+                        return {
+                            ...base,
+                            type: 'firework',
+                            vx: (Math.random() - 0.5) * 3,
+                            vy: (Math.random() - 0.5) * 3,
+                            life: 1,
+                            decay: Math.random() * 0.015 + 0.008
+                        };
+                    case 'christmas':
+                        return {
+                            ...base,
+                            type: 'snow',
+                            size: Math.random() * 6 + 2,
+                            speedY: Math.random() * 1.5 + 0.3,
+                            sway: Math.random() * 0.02
+                        };
+                    case 'bolivia':
+                        return {
+                            ...base,
+                            type: 'flag',
+                            size: Math.random() * 25 + 15,
+                            wave: Math.random() * Math.PI * 2
+                        };
+                    case 'fire':
+                        return {
+                            ...base,
+                            type: 'fire',
+                            size: Math.random() * 18 + 8,
+                            speedY: -Math.random() * 2.5 - 0.5,
+                            flicker: Math.random() * Math.PI
+                        };
+                    default:
+                        return { ...base, type: 'circle' };
+                }
+            }
+
+            animate() {
+                if (!this.ctx || !this.canvas) return;
+                
+                const ctx = this.ctx;
+                const canvas = this.canvas;
+                
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                this.particles.forEach((p) => {
+                    p.x += p.speedX;
+                    p.y += p.speedY;
+                    p.rotation += p.rotationSpeed;
+                    
+                    if (this.mouse.x !== null && this.mouse.y !== null) {
+                        const dx = p.x - this.mouse.x;
+                        const dy = p.y - this.mouse.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 120) {
+                            const force = (120 - dist) / 120;
+                            p.x += dx * force * 0.04;
+                            p.y += dy * force * 0.04;
+                        }
+                    }
+                    
+                    this.actualizarParticula(p);
+                    this.dibujarParticula(p);
+                    
+                    if (p.x < -50 || p.x > canvas.width + 50 || 
+                        p.y < -50 || p.y > canvas.height + 50) {
+                        this.resetParticula(p);
+                    }
+                });
+                
+                this.animationId = requestAnimationFrame(() => this.animate());
+            }
+
+            actualizarParticula(p) {
+                switch(p.type) {
+                    case 'confetti':
+                        p.wobble += 0.08;
+                        p.x += Math.sin(p.wobble) * 0.3;
+                        break;
+                    case 'snow':
+                        p.x += Math.sin(p.y * 0.008) * 0.3;
+                        break;
+                    case 'firework':
+                        p.life -= p.decay;
+                        p.vy += 0.08;
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        break;
+                    case 'flag':
+                        p.wave += 0.04;
+                        break;
+                    case 'fire':
+                        p.flicker += 0.15;
+                        p.size += Math.sin(p.flicker) * 0.3;
+                        p.opacity = 0.4 + Math.sin(p.flicker) * 0.2;
+                        break;
+                }
+            }
+
+            dibujarParticula(p) {
+                const ctx = this.ctx;
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                ctx.globalAlpha = p.opacity;
+                
+                switch(p.type) {
+                    case 'confetti':
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.roundRect(-p.size/2, -p.size/4, p.size, p.size/2, 2);
+                        ctx.fill();
+                        break;
+                        
+                    case 'skull':
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.arc(0, -p.size/4, p.size/2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#1a1a2e';
+                        ctx.beginPath();
+                        ctx.arc(-p.size/4, -p.size/4, p.size/6, 0, Math.PI * 2);
+                        ctx.arc(p.size/4, -p.size/4, p.size/6, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillRect(-p.size/3, p.size/4, p.size/1.5, p.size/4);
+                        break;
+                        
+                    case 'snow':
+                        ctx.fillStyle = '#FFF';
+                        ctx.beginPath();
+                        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                        ctx.beginPath();
+                        ctx.arc(-p.size/3, -p.size/3, p.size/3, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                        
+                    case 'flag':
+                        const wave = Math.sin(p.wave) * 4;
+                        ctx.fillStyle = '#e94560';
+                        ctx.fillRect(-p.size/2, -p.size/3, p.size, p.size/3);
+                        ctx.fillStyle = '#ffd700';
+                        ctx.fillRect(-p.size/2, 0, p.size, p.size/3);
+                        ctx.fillStyle = '#0f3460';
+                        ctx.fillRect(-p.size/2, p.size/3, p.size, p.size/3);
+                        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+                        ctx.beginPath();
+                        ctx.moveTo(-p.size/2, 0);
+                        ctx.quadraticCurveTo(0, wave, p.size/2, 0);
+                        ctx.stroke();
+                        break;
+                        
+                    case 'firework':
+                        if (p.life > 0) {
+                            ctx.fillStyle = p.color;
+                            ctx.globalAlpha = p.life * p.opacity;
+                            ctx.beginPath();
+                            ctx.arc(0, 0, p.size * p.life, 0, Math.PI * 2);
+                            ctx.fill();
+                            ctx.strokeStyle = p.color;
+                            ctx.lineWidth = 1.5;
+                            ctx.beginPath();
+                            ctx.moveTo(0, 0);
+                            ctx.lineTo(-p.vx * 4, -p.vy * 4);
+                            ctx.stroke();
+                        }
+                        break;
+
+                    case 'fire':
+                        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, p.size);
+                        gradient.addColorStop(0, p.color);
+                        gradient.addColorStop(0.4, 'rgba(255, 140, 0, 0.4)');
+                        gradient.addColorStop(1, 'transparent');
+                        ctx.fillStyle = gradient;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                        break;
+                        
+                    default:
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                }
+                
+                ctx.restore();
+            }
+
+            resetParticula(p) {
+                const canvas = this.canvas;
+                p.x = Math.random() * canvas.width;
+                p.y = -50;
+                if (p.type === 'firework') {
+                    p.y = canvas.height + 50;
+                    p.vy = -Math.random() * 8 - 4;
+                    p.life = 1;
+                }
+                if (p.type === 'fire') {
+                    p.y = canvas.height + 50;
+                    p.opacity = Math.random() * 0.4 + 0.3;
+                }
+            }
+
+            compartir(festividad) {
+                const text = `Editorial Binomio celebra: ${festividad.nombre} 🎉🇧🇴`;
+                if (navigator.share) {
+                    navigator.share({ title: 'Editorial Binomio', text: text, url: window.location.href });
+                } else {
+                    navigator.clipboard.writeText(text);
+                    alert('¡Mensaje copiado al portapapeles!');
+                }
+            }
+
+            cerrar() {
+                cancelAnimationFrame(this.animationId);
+                if (this.overlay) {
+                    this.overlay.style.opacity = '0';
+                    this.overlay.style.transform = 'scale(1.1)';
+                    setTimeout(() => {
+                        this.overlay.remove();
+                    }, 500);
+                }
+            }
+        }
+
+        // Inicializar doodle de festividades (AUTOMÁTICO, SIN BOTÓN)
+        const doodle = new EditorialBinomioFestividades();
+        window.doodle = doodle; // Accesible globalmente por si acaso
+        
+        // ============================================
+        // INICIALIZACIÓN DEL SISTEMA
+        // ============================================
+        
+        async function inicializarAplicacion() {
+            // Cargar datos iniciales
+            cargarDatosIniciales();
+            
+            // Configurar hora actual
+            actualizarHora();
+            setInterval(actualizarHora, 1000);
+            
+            // Registrar service worker para FCM
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                    console.log('Service Worker registrado:', registration);
+                } catch (error) {
+                    console.error('Error registrando Service Worker:', error);
+                }
+            }
+            
+            // Configurar Firebase Auth State
+            onAuthStateChanged(window.firebaseAuth, (user) => {
+                if (user) {
+                    usuarioGoogle = user;
+                    document.getElementById('login-google').style.display = 'none';
+                    document.getElementById('logout-google').style.display = 'flex';
+                    
+                    cargarDatosDesdeLaNube().then(() => {
+                        if (!usuarioActual) {
+                            mostrarModalUsuario();
+                        } else {
+                            actualizarDisplayUsuario();
+                            actualizarTabla();
+                        }
+                    });
+                } else {
+                    usuarioGoogle = null;
+                    document.getElementById('login-google').style.display = 'flex';
+                    document.getElementById('logout-google').style.display = 'none';
+                    actualizarEstadoNube(false, 'Inicia sesión para guardar en la nube');
+                    
+                    if (!usuarioActual) {
+                        mostrarModalUsuario();
+                    } else {
+                        actualizarDisplayUsuario();
+                        actualizarTabla();
+                    }
+                }
+            });
+            
+            // Aplicar mejoras guardadas si existen
+            const codigoGuardado = localStorage.getItem('codigo_mejoras');
+            if (codigoGuardado) {
+                try {
+                    eval(codigoGuardado);
+                } catch (error) {
+                    console.error('Error al cargar mejoras:', error);
+                }
+            }
+            
+            // Mostrar sistema
+            setTimeout(() => {
+                document.getElementById('loading-screen').style.display = 'none';
+                document.getElementById('main-system').style.display = 'block';
+            }, 1000);
+        }
+        
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', inicializarAplicacion);
+        
+        // Botones de turno
+        document.getElementById('entrada-manana').addEventListener('click', () => registrarTurno('Mañana', 'Entrada'));
+        document.getElementById('salida-manana').addEventListener('click', () => registrarTurno('Mañana', 'Salida'));
+        document.getElementById('entrada-tarde').addEventListener('click', () => registrarTurno('Tarde', 'Entrada'));
+        document.getElementById('salida-tarde').addEventListener('click', () => registrarTurno('Tarde', 'Salida'));
+        
+        // Botones de usuario
+        document.getElementById('cambiar-usuario').addEventListener('click', mostrarModalUsuario);
+        
+        // Botones de gestión
+        document.getElementById('gestion-usuarios').addEventListener('click', function() {
+            mostrarMensaje('Función en desarrollo', 'error');
+        });
+        
+        // Botones de exportación/importación
+        document.getElementById('exportar-sistema').addEventListener('click', exportarSistema);
+        document.getElementById('importar-sistema').addEventListener('click', importarSistema);
+        
+        // NUEVO BOTÓN: LIMPIAR REGISTROS DEL MES
+        document.getElementById('limpiar-mes-actual').addEventListener('click', limpiarRegistrosMesActual);
+        
+        // Botones de autenticación Google
+        document.getElementById('login-google').addEventListener('click', iniciarSesionGoogle);
+        document.getElementById('logout-google').addEventListener('click', cerrarSesionGoogle);
+        
+        // Botones de notificaciones
+        document.getElementById('solicitar-permisos').addEventListener('click', solicitarPermisoNotificaciones);
+        document.getElementById('test-notification').addEventListener('click', enviarNotificacionPrueba);
+        
+        // Botones de desarrollador
+        document.getElementById('toggle-dev').addEventListener('click', mostrarPanelDesarrollador);
+        document.getElementById('dev-save').addEventListener('click', implementarMejoras);
+        document.getElementById('dev-reset').addEventListener('click', restaurarSistema);
+        
+        // Modal de usuario
+        document.getElementById('crear-usuario').addEventListener('click', crearUsuario);
+        document.getElementById('cerrar-modal').addEventListener('click', () => {
+            document.getElementById('usuario-modal').classList.remove('active');
+        });
+        
+        document.getElementById('nuevo-usuario').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') crearUsuario();
+        });
+        
+        // Modal de contraseña
+        document.getElementById('password-confirm').addEventListener('click', verificarPassword);
+        document.getElementById('password-cancel').addEventListener('click', () => {
+            document.getElementById('password-modal').classList.remove('active');
+            document.getElementById('password-error').style.display = 'none';
+            document.getElementById('password-input').value = '';
+        });
+        
+        document.getElementById('password-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') verificarPassword();
+        });
+        
+        // Filtros
+        document.getElementById('filtro-mes').addEventListener('change', actualizarTabla);
+        document.getElementById('salario-hora').addEventListener('input', actualizarTabla);
+        
+        // Cerrar modales al hacer clic fuera
+        window.addEventListener('click', (event) => {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+                if (event.target.id === 'password-modal') {
+                    document.getElementById('password-error').style.display = 'none';
+                }
+            }
+        });
+        
+        // Cerrar con ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+                document.getElementById('password-error').style.display = 'none';
+            }
+        });
+        
+        // Optimización para dispositivos táctiles
+        document.addEventListener('touchstart', function() {}, {passive: true});
+    </script>
+</body>
+</html>
