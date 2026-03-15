@@ -995,7 +995,7 @@
         <div class="current-time" id="current-time"></div>
         
         <div class="main-content">
-            <!-- Panel de Desarrollador - VERSIÓN CORREGIDA -->
+            <!-- Panel de Desarrollador -->
             <div class="dev-panel" id="dev-panel">
                 <h3><i class="fas fa-code"></i> PANEL DE DESARROLLADOR</h3>
                 <p style="text-align: center; margin-bottom: 20px; color: var(--color-text-muted);">
@@ -2390,7 +2390,7 @@
         window.doodle = doodle;
         
         // ============================================
-        // FUNCIONES PARA PROBAR NOTIFICACIONES (DESDE PANEL)
+        // FUNCIONES PARA PROBAR NOTIFICACIONES (CORREGIDAS)
         // ============================================
         
         function agregarLog(mensaje) {
@@ -2404,60 +2404,112 @@
             }
         }
 
-        function enviarNotificacionPrueba(titulo, categoria) {
-            if ('Notification' in window) {
-                if (Notification.permission === 'granted') {
-                    const mensajes = mensajesNotificacion[categoria];
-                    const indice = Math.floor(Math.random() * mensajes.length);
-                    const mensaje = mensajes[indice];
-                    
-                    new Notification(titulo, {
-                        body: mensaje,
-                        vibrate: [200, 100, 200],
-                        icon: '/favicon.ico'
-                    });
-                    
-                    agregarLog(`✅ ${titulo} - ${mensaje.substring(0, 30)}...`);
-                    
-                } else if (Notification.permission === 'denied') {
-                    alert('Permiso denegado');
-                } else {
-                    Notification.requestPermission();
+        // CORRECCIÓN DE BOTONES DE NOTIFICACIONES
+        document.addEventListener('click', function(e) {
+            // Botón Entrada Mañana
+            if (e.target.closest('#test-noti-entrada-manana')) {
+                if ('Notification' in window) {
+                    if (Notification.permission === 'granted') {
+                        const indice = Math.floor(Math.random() * mensajesNotificacion.entradaManana.length);
+                        new Notification('🌅 ENTRADA MAÑANA', {
+                            body: mensajesNotificacion.entradaManana[indice],
+                            vibrate: [200, 100, 200]
+                        });
+                        agregarLog('✅ ENTRADA MAÑANA enviada');
+                    } else {
+                        Notification.requestPermission();
+                    }
                 }
             }
-        }
-
-        // Event listeners
-        document.getElementById('test-noti-entrada-manana')?.addEventListener('click', () => {
-            enviarNotificacionPrueba('🌅 ENTRADA MAÑANA', 'entradaManana');
-        });
-
-        document.getElementById('test-noti-salida-manana')?.addEventListener('click', () => {
-            enviarNotificacionPrueba('🏁 SALIDA MAÑANA', 'salidaManana');
-        });
-
-        document.getElementById('test-noti-entrada-tarde')?.addEventListener('click', () => {
-            enviarNotificacionPrueba('☀️ ENTRADA TARDE', 'entradaTarde');
-        });
-
-        document.getElementById('test-noti-salida-tarde')?.addEventListener('click', () => {
-            enviarNotificacionPrueba('🌙 SALIDA TARDE', 'salidaTarde');
-        });
-
-        document.getElementById('test-noti-aleatoria')?.addEventListener('click', () => {
-            const categorias = ['entradaManana', 'salidaManana', 'entradaTarde', 'salidaTarde'];
-            const titulos = ['🌅', '🏁', '☀️', '🌙'];
-            const i = Math.floor(Math.random() * categorias.length);
-            enviarNotificacionPrueba(`${titulos[i]} ALEATORIA`, categorias[i]);
-        });
-
-        document.getElementById('test-noti-10-seg')?.addEventListener('click', () => {
-            agregarLog('⏰ Programada para 10 segundos...');
-            setTimeout(() => {
+            
+            // Botón Salida Mañana
+            if (e.target.closest('#test-noti-salida-manana')) {
+                if ('Notification' in window) {
+                    if (Notification.permission === 'granted') {
+                        const indice = Math.floor(Math.random() * mensajesNotificacion.salidaManana.length);
+                        new Notification('🏁 SALIDA MAÑANA', {
+                            body: mensajesNotificacion.salidaManana[indice],
+                            vibrate: [200, 100, 200]
+                        });
+                        agregarLog('✅ SALIDA MAÑANA enviada');
+                    } else {
+                        Notification.requestPermission();
+                    }
+                }
+            }
+            
+            // Botón Entrada Tarde
+            if (e.target.closest('#test-noti-entrada-tarde')) {
+                if ('Notification' in window) {
+                    if (Notification.permission === 'granted') {
+                        const indice = Math.floor(Math.random() * mensajesNotificacion.entradaTarde.length);
+                        new Notification('☀️ ENTRADA TARDE', {
+                            body: mensajesNotificacion.entradaTarde[indice],
+                            vibrate: [200, 100, 200]
+                        });
+                        agregarLog('✅ ENTRADA TARDE enviada');
+                    } else {
+                        Notification.requestPermission();
+                    }
+                }
+            }
+            
+            // Botón Salida Tarde
+            if (e.target.closest('#test-noti-salida-tarde')) {
+                if ('Notification' in window) {
+                    if (Notification.permission === 'granted') {
+                        const indice = Math.floor(Math.random() * mensajesNotificacion.salidaTarde.length);
+                        new Notification('🌙 SALIDA TARDE', {
+                            body: mensajesNotificacion.salidaTarde[indice],
+                            vibrate: [200, 100, 200]
+                        });
+                        agregarLog('✅ SALIDA TARDE enviada');
+                    } else {
+                        Notification.requestPermission();
+                    }
+                }
+            }
+            
+            // Botón Aleatoria
+            if (e.target.closest('#test-noti-aleatoria')) {
                 const categorias = ['entradaManana', 'salidaManana', 'entradaTarde', 'salidaTarde'];
+                const titulos = ['🌅', '🏁', '☀️', '🌙'];
                 const i = Math.floor(Math.random() * categorias.length);
-                enviarNotificacionPrueba('⏰ PROGRAMADA', categorias[i]);
-            }, 10000);
+                
+                if ('Notification' in window) {
+                    if (Notification.permission === 'granted') {
+                        const indice = Math.floor(Math.random() * mensajesNotificacion[categorias[i]].length);
+                        new Notification(`${titulos[i]} ALEATORIA`, {
+                            body: mensajesNotificacion[categorias[i]][indice],
+                            vibrate: [200, 100, 200]
+                        });
+                        agregarLog(`✅ ALEATORIA enviada (${titulos[i]})`);
+                    } else {
+                        Notification.requestPermission();
+                    }
+                }
+            }
+            
+            // Botón 10 segundos
+            if (e.target.closest('#test-noti-10-seg')) {
+                agregarLog('⏳ Programada para 10 segundos...');
+                setTimeout(() => {
+                    const categorias = ['entradaManana', 'salidaManana', 'entradaTarde', 'salidaTarde'];
+                    const titulos = ['🌅', '🏁', '☀️', '🌙'];
+                    const i = Math.floor(Math.random() * categorias.length);
+                    
+                    if ('Notification' in window) {
+                        if (Notification.permission === 'granted') {
+                            const indice = Math.floor(Math.random() * mensajesNotificacion[categorias[i]].length);
+                            new Notification(`⏰ ${titulos[i]}`, {
+                                body: mensajesNotificacion[categorias[i]][indice],
+                                vibrate: [200, 100, 200]
+                            });
+                            agregarLog(`✅ PROGRAMADA enviada (${titulos[i]})`);
+                        }
+                    }
+                }, 10000);
+            }
         });
 
         // ============================================
